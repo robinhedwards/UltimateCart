@@ -5,6 +5,7 @@ More details to follow.
 
 Bill of Materials
 -----------------
+```
 1 x PCB (eagle .brd file can be uploaded to e.g. OSH park)
 1 x Altera 10M08SAE144C8GES (Mouser part #989-10M08SAE144C8GES)
 1 x Alliance Memory AS6C8008-55ZIN (Mouser part #913-AS6C8008-55ZIN)
@@ -22,3 +23,4 @@ Bill of Materials
 1 x 0805 LED (e.g. Farnell order code #1581239)
 1 x 200ohm 0805 Resistor (e.g. Farnell order #2447602)
 1 x Header male 2x1 0.1" pitch
+```
