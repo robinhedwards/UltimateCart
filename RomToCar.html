@@ -1,0 +1,239 @@
+<!DOCTYPE HTML>
+<html>
+    <head>
+        <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+        <title>Atari 8-bit ROM -> CAR file</title>
+		<style>
+			body {
+				font-family: monospace;
+			}
+			#drop_zone {
+				background-color: #EEE;
+				position: relative;
+				width: 200px;
+				height: 50px;
+				border: 2px dashed #AAA;
+				border-radius: 6px;
+				padding: 10px;
+				text-align: center;
+				cursor: cell;
+				font-size: 16px;
+			}
+			p.error {
+				color: red;
+			}
+			table.file {
+				margin-top: 10px;
+				margin-bottom: 10px;
+				width: 400px;
+				background-color: aliceblue;
+			}
+			.save {
+				cursor: pointer;
+				color: blue;
+			}
+			.save:hover {
+				font-weight: bold;
+			}
+		</style>
+			
+		<script type="text/javascript">
+		var car_types = {
+			size_8 : [ 
+				{name: 'Standard 8k cartridge', id: 1 },
+				{name: 'OSS 8 KB cartridge', id: 44 },
+			],
+			size_16 : [ 
+				{name: 'Standard 16k cartridge', id: 2 },
+				{name: 'OSS two chip 16 KB cartridge (034M)', id: 3 },
+				{name: 'OSS two chip 16 KB cartridge (043M)', id: 45 },
+				{name: 'OSS one chip 16 KB cartridge', id: 15 },
+				{name: 'MegaCart 16 KB cartridge', id: 26 },
+				{name: 'Blizzard 16 KB cartridge', id: 40 },
+			],
+			size_32 : [ 
+				{name: 'XEGS 32 KB cartridge', id: 12 },
+				{name: '32 KB Williams cartridge', id: 22 },
+				{name: 'MegaCart 32 KB cartridge', id: 27 },
+				{name: 'Switchable XEGS 32 KB cartridge', id: 33 },
+			],
+			size_40 : [ 
+				{name: 'Bounty Bob Strikes Back 40 KB cartridge', id: 18 },
+			],
+			size_64 : [ 
+				{name: 'XEGS 64 KB cartridge', id: 13 },
+				{name: '64 KB Williams cartridge', id: 8 },
+				{name: 'Express 64 KB cartridge ', id: 9 },
+				{name: 'Diamond 64 KB cartridge', id: 10 },
+				{name: 'SpartaDOS X 64 KB cartridge', id: 11 },
+				{name: 'MegaCart 64 KB cartridge', id: 28 },
+				{name: 'Switchable XEGS 64 KB cartridge', id: 34 },
+			],
+			size_128 : [ 
+				{name: 'XEGS 128 KB cartridge', id: 14 },
+				{name: 'Atarimax 128 KB cartridge', id: 41 },
+				{name: 'MegaCart 128 KB cartridge', id: 29 },
+				{name: 'Switchable XEGS 128 KB cartridge', id: 35 },
+				{name: 'SpartaDOS X 128 KB cartridge', id: 43 },
+				{name: 'SIC! 128 KB cartridge', id: 54 },
+			],
+			size_256 : [ 
+				{name: 'XEGS 256 KB cartridge', id: 23 },
+				{name: 'MegaCart 256 KB cartridge', id: 30 },
+				{name: 'Switchable XEGS 256 KB cartridge', id: 36 },
+				{name: 'SIC! 256 KB cartridge', id: 55 },
+			],
+			size_512 : [ 
+				{name: 'XEGS 512 KB cartridge', id: 24 },
+				{name: 'MegaCart 512 KB cartridge', id: 31 },
+				{name: 'Switchable XEGS 512 KB cartridge', id: 37 },
+				{name: 'SIC! 512 KB cartridge', id: 56 },
+			],
+			size_1024 : [ 
+				{name: 'Atarimax 1 MB Flash cartridge', id: 42 },
+				{name: 'XEGS 1024 KB cartridge', id: 25 },
+				{name: 'MegaCart 1024 KB cartridge', id: 32 },
+				{name: 'Switchable XEGS 1024 KB cartridge', id: 38 },
+			],
+					
+		}
+		function saveAsCAR(filename, romData, car_type) {
+			// change extersion to .car
+			var tmp = filename.split('.');
+			tmp.pop();
+			tmp.push('car');
+			var car_filename = tmp.join('.');
+			
+			var output = new Uint8Array(romData.length + 16);
+			
+			var idStr = "CART";
+			for (var i = 0; i < idStr.length; ++i)
+			   output[i] = idStr.charCodeAt(i);
+			output[7] = car_type;
+			output.set(romData, 16);
+			// checksum
+			var checksum = 0;
+			for (var i=0; i<romData.length; i++) {
+				checksum += romData[i];
+				checksum &= 0xffffffff;
+			}			
+			output[8] = (checksum>>24) & 0xFF;
+			output[9] = (checksum>>16) & 0xFF;
+			output[10] = (checksum>>8) & 0xFF;
+			output[11] = checksum & 0xFF;
+			// now save the file
+			
+			var a = window.document.createElement('a');
+			a.href = window.URL.createObjectURL(new Blob([output], { type: 'xxx' }));
+			a.download = car_filename;
+			document.body.appendChild(a)
+			a.click();
+			document.body.removeChild(a)
+		}
+		function fileClicked(file, car_type) {
+			var reader = new FileReader();
+			reader.onload = function(e) {
+				var arrayBuffer = reader.result;
+				var byteArray = new Uint8Array(arrayBuffer);
+				saveAsCAR(file.name, byteArray, car_type);
+			};
+			reader.readAsArrayBuffer(file);
+			
+		}
+		function convertFile(file) {
+			if (file.size % 1024) {
+				log("Length of " + file.name +" is not a multiple of 1024 bytes", true);
+				return;
+			}
+			var key = "size_" + file.size / 1024;
+			var matches = car_types[key];
+			if (!matches) {
+				log("No matching cartridge types for " +  (file.size/1024) + "k file "+ file.name, true);
+			}
+			
+		    var table = document.createElement('table');
+			table.border='1';
+			table.className='file';
+			
+			var tableBody = document.createElement('tbody');
+			table.appendChild(tableBody);
+			var tr = document.createElement('tr');
+			var td = document.createElement('td');
+			td.innerHTML = "<b>" + file.name + " -> </b>";
+			tr.appendChild(td);
+			tableBody.appendChild(tr);
+			
+			for (var i=0; i<matches.length; i++) {
+				var type = matches[i];
+				var tr = document.createElement('tr');
+				var td = document.createElement('td');
+				td.innerHTML = type.name + " (" + type.id + ")";
+				td.onclick = fileClicked.bind(this, file, type.id);
+				td.className = "save";
+				tr.appendChild(td);
+				tableBody.appendChild(tr);
+			}
+			
+			document.getElementById('output').appendChild(table);
+		}
+		function log(str, error) {
+			var contents = document.getElementById('output').innerHTML;
+			contents += '<p class="log' + (error ? ' error' : '') + '">' + str + '</p>';
+			document.getElementById('output').innerHTML = contents;
+		}
+		function handleFileSelect(evt) {
+			evt.stopPropagation();
+			evt.preventDefault();
+
+			var files = evt.dataTransfer.files; // FileList object.
+
+			// files is a FileList of File objects
+			var output = [];
+			for (var i = 0, f; f = files[i]; i++) {
+				var ext = f.name.split('.').pop().toUpperCase();
+				if (ext == 'ROM' || ext == "BIN")
+					convertFile(f);
+				else
+					log("Not a ROM file: " + f.name, true);
+			}
+		}
+
+		function handleDragOver(evt) {
+			evt.stopPropagation();
+			evt.preventDefault();
+			evt.dataTransfer.dropEffect = 'copy'; // Explicitly show this is a copy.
+		}
+
+		function init() {
+			// Setup the dnd listeners.
+			var dropZone = document.getElementById('drop_zone');
+			dropZone.addEventListener('dragover', handleDragOver, false);
+			dropZone.addEventListener('drop', handleFileSelect, false);
+		}
+		</script>
+		
+    </head>
+    <body onload="init()">
+		<pre>
+  _______________
+ |  |||||||||||  |
+ |  ||_______||  | <b>Atari 8-bit ROM to CAR file conversion</b>
+ | / _________ \ | 
+ | LLLLLLLLLLL L |               Robin Edwards 2015
+ | LLLLLLLLLLL L |
+ |___[_____]_____|
+
+ROM/BIN files are simple dumps of a cartridge ROM. You need to know what type of cartridge the ROM dump
+is from. Available options are shown on a list when the file is read. Choose one of the options to save
+a CAR file of the correct type.
+
+Converts to those cartridge types supported by the <b>Ultimate Cartridge</b>.
+
+Tested in Firefox & Chrome.
+In Firefox you may want to go to Tools/Options and select "Always ask me where to save files".
+In Chrome the setting is Advanced Settings/Downloads "Ask where to save each file before downloading".
+		</pre>
+		<div id="drop_zone"><b>Drag & drop ROM files here</b></div>
+		<div id="output"></div>
+    </body>
+</html>

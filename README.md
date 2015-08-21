@@ -1,6 +1,23 @@
 Ultimate Cart
 =============
-An SD-card based multicart for Atari 8-bit computers.
+The Ultimate Cart is an SD-card based multicart for the Atari 8-bit, which I've been developing for the last few months.
+It allows you to browse the SD card on the atari and launch cartridge images from ROM and CAR files from the menu.
+The PCB is designed to fit in a standard grey cartridge case (after a bit of modification with some clippers and a file).
+
+![Image](images/800xl.jpg?raw=true)
+
+It supports most ROMs up to 1 megabyte in size, including standard 8k and 16k cartridges, XEGS, AtariMax 1 & 8mbit ROMs,
+SIC! Cart, Bounty Bob, OSS, SDX & Williams. ROM dumps can be easily converted into CAR format with my html/javascript
+conversion utility, [Rom2Car](RomToCar.html)
+
+
+![Image](images/800xl.jpg?raw=true)
+
+PCB Images
+----------
+![Bottom/Back of PCB when inserted in Atari](images/board_bottom_back.jpg?raw=true)
+![Top/Front of PCB when inserted in Atari](images/board_top_front.jpg?raw=true)
+
 More details to follow.
 
 Bill of Materials
