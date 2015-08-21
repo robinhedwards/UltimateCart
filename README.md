@@ -38,3 +38,14 @@ Bill of Materials
 1 x 200ohm 0805 Resistor (e.g. Farnell order #2447602)
 1 x Header male 2x1 0.1" pitch
 ```
+
+Assembly
+--------
+
+Details to follow, though the schematic, board file and assembled images above are probably sufficient by themselves
+for a determined person to complete the board. Programming files for the FPGA are also included - a USB Blaster is
+required.
+
+Errors - R11 is a pullup resistor on the SD card CS line. This is not required since it turns out that SD cards have
+internal pullups, but shouldn't cause any problems if you do populate it. Its shown unpopulated on the images above.
+
