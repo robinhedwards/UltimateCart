@@ -10,9 +10,6 @@ It supports most ROMs up to 1 megabyte in size, including standard 8k and 16k ca
 SIC! Cart, Bounty Bob, OSS, SDX & Williams. ROM dumps can be easily converted into CAR format with my html/javascript
 conversion utility, [Rom2Car](RomToCar.html)
 
-
-![Image](images/800xl.jpg?raw=true)
-
 PCB Images
 ----------
 ![Bottom/Back of PCB when inserted in Atari](images/board_bottom_back.jpg?raw=true)
