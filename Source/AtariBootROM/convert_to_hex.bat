@@ -1,0 +1,1 @@
+avr-objcopy.exe -I binary -O ihex boot.rom boot_rom.hex
