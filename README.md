@@ -28,7 +28,7 @@ Bill of Materials
 1 x Abracon ASE-50.000MHZ-ET (Farnell order code #2467898)
 1 x LD1117S33TR (Farnell order code #1202826)
 1 x TE Connectivity 2041021-3 (Farnell order code #2112526)
-1 x Shrouded box header 2x5 (e.g. Hobbytronics.co.uk - BOXHEAD25)
+1 x Shrouded box header 2x5 (e.g. Hobbytronics.co.uk - BOXHEAD25, Farnell order code #2215304)
 1 x Momentary tactile switch Right Angled PCB Mount (ebay)
 3 x 10uF 0805 Capacitors (e.g. Farnell order code #2320856)
 11 x 0.1uF 0805 Capacitors (e.g. Farnell order code #1759143)
