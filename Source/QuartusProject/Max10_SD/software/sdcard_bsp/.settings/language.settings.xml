@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<project>
+	<configuration id="preference.org.eclipse.cdt.managedbuilder.core.configurationDataProvider.1034138763" name="Nios II">
+		<extension point="org.eclipse.cdt.core.LanguageSettingsProvider">
+			<provider class="com.altera.sbtgui.project.importer.Nios2GCCBuiltinSpecsDetector" console="false" env-hash="749283435719723539" id="altera.tool.Nios2GCCBuiltinSpecsDetector" keep-relative-paths="false" name="Nios II GCC Built-in Compiler Settings" parameter="${COMMAND} ${FLAGS} -E -P -v -dD &quot;${INPUTS}&quot;" prefer-non-shared="true">
+				<language-scope id="org.eclipse.cdt.core.gcc"/>
+				<language-scope id="org.eclipse.cdt.core.g++"/>
+			</provider>
+			<provider class="org.eclipse.cdt.managedbuilder.language.settings.providers.GCCBuildCommandParser" id="altera.tool.Nios2GCCBuildCommandParser" keep-relative-paths="false" name="Nios II GCC Build Output Parser" parameter="(nios2-elf-gcc)|(nios2-elf-g\+\+)" prefer-non-shared="true"/>
+			<provider copy-of="extension" id="org.eclipse.cdt.ui.UserLanguageSettingsProvider"/>
+			<provider-reference id="org.eclipse.cdt.core.ReferencedProjectsLanguageSettingsProvider" ref="shared-provider"/>
+			<provider-reference id="org.eclipse.cdt.managedbuilder.core.MBSLanguageSettingsProvider" ref="shared-provider"/>
+		</extension>
+	</configuration>
+</project>

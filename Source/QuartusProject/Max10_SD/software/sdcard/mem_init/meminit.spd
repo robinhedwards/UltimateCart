@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<simPackage>
+<file path="hdl_sim/boot_rom.dat" type="DAT" initParamName="INIT_FILE" memoryPath="cart_memory" />
+<file path="hdl_sim/host_memory.dat" type="DAT" initParamName="INIT_FILE" memoryPath="memory" />
+<file path="boot_rom.hex" type="HEX" initParamName="INIT_FILE" memoryPath="cart_memory" />
+<file path="host_memory.hex" type="HEX" initParamName="INIT_FILE" memoryPath="memory" />
+</simPackage>

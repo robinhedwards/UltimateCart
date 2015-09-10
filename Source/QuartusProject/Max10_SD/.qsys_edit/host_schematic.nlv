@@ -1,0 +1,31 @@
+# # File gsaved with Nlview version 6.3.8  2013-12-19 bk=1.2992 VDI=34 GEI=35
+# 
+preplace inst host.spi_master_0 -pg 1 -lvl 3 -y 760
+preplace inst host -pg 1 -lvl 1 -y 40 -regml 5 -regy -20
+preplace inst host.sysid_2466 -pg 1 -lvl 3 -y 450
+preplace inst host.jtag_uart_0 -pg 1 -lvl 3 -y 540
+preplace inst host.ext_sram_controller_0 -pg 1 -lvl 3 -y 140
+preplace inst host.atari_d500_byte -pg 1 -lvl 3 -y 30
+preplace inst host.led -pg 1 -lvl 3 -y 870
+preplace inst host.cpu -pg 1 -lvl 2 -y 580
+preplace inst host.sel_cartridge_type -pg 1 -lvl 3 -y 1200
+preplace inst host.timer_0 -pg 1 -lvl 3 -y 650
+preplace inst host.clk_0 -pg 1 -lvl 1 -y 640
+preplace inst host.reset_d500 -pg 1 -lvl 3 -y 1090
+preplace inst host.memory -pg 1 -lvl 3 -y 360
+preplace inst host.cart_memory -pg 1 -lvl 3 -y 250
+preplace netloc EXPORT<net_container>host</net_container>(SLAVE)spi_master_0.external,(SLAVE)host.spi_master_0) 1 0 3 NJ 790 NJ 790 NJ
+preplace netloc INTERCONNECT<net_container>host</net_container>(SLAVE)cart_memory.s1,(SLAVE)sel_cartridge_type.s1,(SLAVE)reset_d500.s1,(SLAVE)led.s1,(SLAVE)ext_sram_controller_0.avalon_slave,(MASTER)cpu.data_master,(SLAVE)timer_0.s1,(MASTER)cpu.instruction_master,(SLAVE)atari_d500_byte.s1,(SLAVE)sysid_2466.control_slave,(SLAVE)spi_master_0.s1,(SLAVE)jtag_uart_0.avalon_jtag_slave,(SLAVE)cpu.jtag_debug_module,(SLAVE)memory.s1) 1 1 2 400 1270 650
+preplace netloc EXPORT<net_container>host</net_container>(SLAVE)host.sel_cartridge_type,(SLAVE)sel_cartridge_type.external_connection) 1 0 3 NJ 1230 NJ 1230 NJ
+preplace netloc EXPORT<net_container>host</net_container>(SLAVE)host.ext_sram,(SLAVE)ext_sram_controller_0.conduit) 1 0 3 NJ 190 NJ 190 NJ
+preplace netloc EXPORT<net_container>host</net_container>(SLAVE)host.reset_d500,(SLAVE)reset_d500.external_connection) 1 0 3 NJ 1120 NJ 1120 NJ
+preplace netloc EXPORT<net_container>host</net_container>(SLAVE)clk_0.clk_in_reset,(SLAVE)host.reset) 1 0 1 NJ
+preplace netloc EXPORT<net_container>host</net_container>(SLAVE)host.clk,(SLAVE)clk_0.clk_in) 1 0 1 NJ
+preplace netloc EXPORT<net_container>host</net_container>(SLAVE)atari_d500_byte.external_connection,(SLAVE)host.atari_d500_byte) 1 0 3 NJ 60 NJ 60 NJ
+preplace netloc EXPORT<net_container>host</net_container>(SLAVE)cart_memory.s2,(SLAVE)host.cart_memory_s2) 1 0 3 NJ 320 NJ 320 NJ
+preplace netloc EXPORT<net_container>host</net_container>(SLAVE)host.led_external_connection,(SLAVE)led.external_connection) 1 0 3 NJ 900 NJ 900 NJ
+preplace netloc FAN_OUT<net_container>host</net_container>(SLAVE)jtag_uart_0.irq,(SLAVE)timer_0.irq,(MASTER)cpu.d_irq) 1 2 1 690
+preplace netloc FAN_OUT<net_container>host</net_container>(SLAVE)cpu.clk,(SLAVE)ext_sram_controller_0.clock,(SLAVE)led.clk,(SLAVE)memory.clk1,(SLAVE)sysid_2466.clk,(SLAVE)timer_0.clk,(SLAVE)cart_memory.clk1,(MASTER)clk_0.clk,(SLAVE)jtag_uart_0.clk,(SLAVE)sel_cartridge_type.clk,(SLAVE)reset_d500.clk,(SLAVE)atari_d500_byte.clk,(SLAVE)spi_master_0.clk) 1 1 2 360 1140 670
+preplace netloc FAN_OUT<net_container>host</net_container>(SLAVE)jtag_uart_0.reset,(MASTER)clk_0.clk_reset,(SLAVE)sysid_2466.reset,(SLAVE)reset_d500.reset,(SLAVE)sel_cartridge_type.reset,(SLAVE)memory.reset1,(SLAVE)cpu.reset_n,(SLAVE)timer_0.reset,(SLAVE)led.reset,(SLAVE)atari_d500_byte.reset,(SLAVE)ext_sram_controller_0.reset,(SLAVE)cart_memory.reset1,(SLAVE)spi_master_0.reset) 1 1 2 380 1250 710
+levelinfo -pg 1 0 150 1070
+levelinfo -hier host 160 190 430 780 1040 1060
