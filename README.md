@@ -35,7 +35,7 @@ Bill of Materials
 1 x 0.01uF 0805 Capacitor (e.g. Farnell order code #1759246)
 9 x 10k 0805 Resistor (e.g. Farnell order code #2447553)
 1 x 0805 LED (e.g. Farnell order code #1581239)
-1 x 200ohm 0805 Resistor (e.g. Farnell order #2447602)
+1 x 200ohm 0805 Resistor (e.g. Farnell order code #2447602)
 1 x Header male 2x1 0.1" pitch
 ```
 
