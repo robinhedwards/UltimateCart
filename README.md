@@ -77,7 +77,8 @@ Any others, use braid, flux and soldering iron to remove.
 Next you will need to hand solder the jtag box header (slot facing outwards), and 2x1 male header.
 
 Now is a good time to check for shorts - (1) between the +5V and GND pins of the male header, (2) between +3.3v
-and GND on the regulator, and (3) between VCC and GND on the IDT quickswitches.
+and GND on the regulator, and (3) between VCC and GND on the IDT quickswitches. If you find a short then STOP
+and fix it. There will be a bridge somewhere. Refer to the eagle files to help identify the location.
 
 Once that's done, you should be able to power up the board, plug in a USB blaster and program the chip from
 Quartus (use the pof file - this permanently programs the chip). If successful you should see the LED on the
