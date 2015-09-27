@@ -46,6 +46,7 @@ for a determined person to complete the board, here is the method I'm using to a
 You will need:
 ```
 Solder paste (I used standard chipquik unleaded) syringe
+Some way of reflowing the board (e.g. cheap toaster oven)
 Solder paste stencil for the fpga side (optional, but recommended - see below)
 Tweezers (or a better tool) for placing the components
 Soldering iron
