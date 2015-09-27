@@ -74,12 +74,13 @@ of the LED and diode correct) and bake again.
 Before you do any hand soldering, check for bridged pins on the ICs. Some pins are bridged on the PCB - thats ok.
 Any others, use braid, flux and soldering iron to remove.
 
-Next you will need to hand solder the jtag box header (gap outwards), and 2x1 male header.
+Next you will need to hand solder the jtag box header (slot facing outwards), and 2x1 male header.
 
-Now is a good time to check for shorts - (1) between the +5V and GND pins of the male header, (2) between +3.3v and GND on
-the regulator, and (3) between VCC and GND on the IDT quickswitches.
+Now is a good time to check for shorts - (1) between the +5V and GND pins of the male header, (2) between +3.3v
+and GND on the regulator, and (3) between VCC and GND on the IDT quickswitches.
 
 Once that's done, you should be able to power up the board, plug in a USB blaster and program the chip from
-Quartus. If successful you should see the LED on the board blinking.
+Quartus (use the pof file - this permanently programs the chip). If successful you should see the LED on the
+board blinking.
 
 Finally, hand solder the SD card slot and reset button to the board. You're done!
