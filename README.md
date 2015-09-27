@@ -8,14 +8,12 @@ The PCB is designed to fit in a standard grey cartridge case (after a bit of mod
 
 It supports most ROMs up to 1 megabyte in size, including standard 8k and 16k cartridges, XEGS, AtariMax 1 & 8mbit ROMs,
 SIC! Cart, Bounty Bob, OSS, SDX & Williams. ROM dumps can be easily converted into CAR format with my html/javascript
-conversion utility, [Rom2Car](http://htmlpreview.github.com/?https://github.com/robinhedwards/UltimateCart/master/RomToCar.html).
+conversion utility, [RomToCar](http://htmlpreview.github.com/?https://github.com/robinhedwards/UltimateCart/master/RomToCar.html).
 
 PCB Images
 ----------
 ![Bottom/Back of PCB when inserted in Atari](images/board_bottom_back.jpg?raw=true)
 ![Top/Front of PCB when inserted in Atari](images/board_top_front.jpg?raw=true)
-
-More details to follow.
 
 Bill of Materials
 -----------------
@@ -42,10 +40,46 @@ Bill of Materials
 Assembly
 --------
 
-Details to follow, though the schematic, board file and assembled images above are probably sufficient by themselves
-for a determined person to complete the board. Programming files for the FPGA are also included - a USB Blaster is
-required.
+Although the schematic, board file and assembled images above are probably sufficient by themselves
+for a determined person to complete the board, here is the method I'm using to assemble the boards.
 
-Errors - R11 is a pullup resistor on the SD card CS line. This is not required since it turns out that SD cards have
-internal pullups, but shouldn't cause any problems if you do populate it. Its shown unpopulated on the images above.
+You will need:
+```
+Solder paste (I used standard chipquik unleaded) syringe
+Solder paste stencil for the fpga side (optional, but recommended - see below)
+Tweezers (or a better tool) for placing the components
+Soldering iron
+Flux and braid to fix any bridged pins (you may not need if you use a stencil)
+USB Blaster to program the fpga
+Blu-tac I find useful for keeping things steady
+```
 
+You can either apply solder paste by hand (using a syringe) or using a stencil. Having done it both ways,
+I'd say the ten pounds I spent on a stencil was the best money I've ever spent! You can get a stencil made
+cheaply from a variety of places. I'd recommend either oshstencils (USA) or smtstencil.co.uk (UK). The
+paste layer was not correct on the original board, but was corrected in the revised version.
+
+Apply the solder paste to the fpga side of the board, making sure you don't forget the ground pad. The
+revised board removes R11 (a pullup resistor on the SD card line) which is not required (since SD cards
+have an internal pull-up on CS).
+
+Then populate the components, with reference to the marks on the board and the images above.
+Bake the board in an over until the paste melts (you'll see it shine), leave it for about 30s-1min, then open
+the oven door and let it cool.
+
+Apply solder paste to the other side of the board (leaving the SD card which is hand soldered). There is
+less need for a stencil for this side of the board, a syringe is fine. Populate (make sure you get the polarity
+of the LED and diode correct) and bake again.
+
+Before you do any hand soldering, check for bridged pins on the ICs. Some pins are bridged on the PCB - thats ok.
+Any others, use braid, flux and soldering iron to remove.
+
+Next you will need to hand solder the jtag box header (gap outwards), and 2x1 male header.
+
+Now is a good time to check for shorts - (1) between the +5V and GND pins of the male header, (2) between +3.3v and GND on
+the regulator, and (3) between VCC and GND on the IDT quickswitches.
+
+Once that's done, you should be able to power up the board, plug in a USB blaster and program the chip from
+Quartus. If successful you should see the LED on the board blinking.
+
+Finally, hand solder the SD card slot and reset button to the board. You're done!
