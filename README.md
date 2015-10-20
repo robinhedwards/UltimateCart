@@ -90,3 +90,15 @@ Quartus (use the pof file - this permanently programs the chip). If successful y
 board blinking.
 
 Finally, hand solder the SD card slot and reset button to the board. You're done!
+
+Erratum (20-Oct-15)
+-------
+Someone who has built this project got in touch to report that some SD cards fail to be recognised.
+It appears that a 10k-100k pullup is required on the SD card DO (pin 7), or some cards will fail to initialise.
+I haven't come across this in the 10 different SD cards I've tested, but if you do have problems then you can fix
+it by adding a 47k pull-up resistor as shown in the photo below.
+
+![Image](images/SD_DO_pullup.jpg?raw=true)
+
+I may add pull-ups to the SD card in a future revision of the PCB.
+
