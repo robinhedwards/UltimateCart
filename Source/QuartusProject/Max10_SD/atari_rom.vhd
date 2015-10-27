@@ -129,6 +129,9 @@ ARCHITECTURE structure OF atari_rom IS
 	signal cart_s5_reg : std_logic := '1';
 	signal cart_rw_reg : std_logic := '1';
 	
+	signal cart_data_reg : std_logic_vector(7 downto 0);
+	signal count: integer range 0 to 255;
+	
 	component host is
 		port (
 			cart_memory_s2_address            : in    std_logic_vector(12 downto 0) := (others => 'X'); -- address
@@ -219,7 +222,22 @@ BEGIN
 									and CART_RW = '1' and CART_ADDR(7 downto 5) = "000");
 		end if;
 	end process;
-	
+
+	-- the cartridge data bus appears to be invalid on the falling edge of phi2 on some XLs
+	-- so sample it approx 160ms after the rising edge (about 80ms before falling edge)
+	process (CLK)
+	begin
+		if (CART_PHI2 = '0') then
+			count <= 0;
+		else
+			if (rising_edge(CLK)) then
+				count <= count + 1;
+				if (count = 8) then
+					cart_data_reg <= CART_DATA;
+				end if;
+			end if;
+		end if;
+	end process;
 	
 	process (CART_PHI2, reset_d500_byte)
 		variable new_cart_type : integer;
@@ -272,7 +290,7 @@ BEGIN
 						when CART_TYPE_BOOT =>
 							if (cart_addr_reg(7 downto 0) = x"10") then
 								-- restrict to D510 only for compatability with Ultimate 1meg
-								atari_d500_byte <= CART_DATA;
+								atari_d500_byte <= cart_data_reg;
 							end if;
 						-- atarimax 1mbit bankswitching
 						when CART_TYPE_ATARIMAX_1MBIT =>
@@ -285,12 +303,12 @@ BEGIN
 							high_bank_enabled <= not cart_addr_reg(7);
 							bank_out <= cart_addr_reg(6 downto 0);
 						-- xegs carts - schematic has RW as NC
-						when CART_TYPE_XEGS_32K => bank_out <= "00000" & CART_DATA(1 downto 0);
-						when CART_TYPE_XEGS_64K => bank_out <= "0000" & CART_DATA(2 downto 0);
-						when CART_TYPE_XEGS_128K => bank_out <= "000" & CART_DATA(3 downto 0);
-						when CART_TYPE_XEGS_256K => bank_out <= "00" & CART_DATA(4 downto 0);
-						when CART_TYPE_XEGS_512K => bank_out <= "0" & CART_DATA(5 downto 0);
-						when CART_TYPE_XEGS_1024K => bank_out <= CART_DATA(6 downto 0);
+						when CART_TYPE_XEGS_32K => bank_out <= "00000" & cart_data_reg(1 downto 0);
+						when CART_TYPE_XEGS_64K => bank_out <= "0000" & cart_data_reg(2 downto 0);
+						when CART_TYPE_XEGS_128K => bank_out <= "000" & cart_data_reg(3 downto 0);
+						when CART_TYPE_XEGS_256K => bank_out <= "00" & cart_data_reg(4 downto 0);
+						when CART_TYPE_XEGS_512K => bank_out <= "0" & cart_data_reg(5 downto 0);
+						when CART_TYPE_XEGS_1024K => bank_out <= cart_data_reg(6 downto 0);
 						-- williams
 						when CART_TYPE_WILLIAMS_64K =>
 							if (cart_addr_reg(7 downto 4) = "0000") then
@@ -360,38 +378,38 @@ BEGIN
 					if (cart_rw_reg = '0') then
 						case cart_type is
 							-- switchable xegs
-							when CART_TYPE_SW_XEGS_32K => bank_out <= "00000" & CART_DATA(1 downto 0);
-							when CART_TYPE_SW_XEGS_64K => bank_out <= "0000" & CART_DATA(2 downto 0);
-							when CART_TYPE_SW_XEGS_128K => bank_out <= "000" & CART_DATA(3 downto 0);
-							when CART_TYPE_SW_XEGS_256K => bank_out <= "00" & CART_DATA(4 downto 0);
-							when CART_TYPE_SW_XEGS_512K => bank_out <= "0" & CART_DATA(5 downto 0);
-							when CART_TYPE_SW_XEGS_1024K => bank_out <= CART_DATA(6 downto 0);
+							when CART_TYPE_SW_XEGS_32K => bank_out <= "00000" & cart_data_reg(1 downto 0);
+							when CART_TYPE_SW_XEGS_64K => bank_out <= "0000" & cart_data_reg(2 downto 0);
+							when CART_TYPE_SW_XEGS_128K => bank_out <= "000" & cart_data_reg(3 downto 0);
+							when CART_TYPE_SW_XEGS_256K => bank_out <= "00" & cart_data_reg(4 downto 0);
+							when CART_TYPE_SW_XEGS_512K => bank_out <= "0" & cart_data_reg(5 downto 0);
+							when CART_TYPE_SW_XEGS_1024K => bank_out <= cart_data_reg(6 downto 0);
 							-- megacart
-							when CART_TYPE_MEGACART_32K => bank_out <= "000000" & CART_DATA(0);
-							when CART_TYPE_MEGACART_64K => bank_out <= "00000" & CART_DATA(1 downto 0);
-							when CART_TYPE_MEGACART_128K => bank_out <= "0000" & CART_DATA(2 downto 0);
-							when CART_TYPE_MEGACART_256K => bank_out <= "000" & CART_DATA(3 downto 0);
-							when CART_TYPE_MEGACART_512K => bank_out <= "00" & CART_DATA(4 downto 0);
-							when CART_TYPE_MEGACART_1024K => bank_out <= "0" & CART_DATA(5 downto 0);
+							when CART_TYPE_MEGACART_32K => bank_out <= "000000" & cart_data_reg(0);
+							when CART_TYPE_MEGACART_64K => bank_out <= "00000" & cart_data_reg(1 downto 0);
+							when CART_TYPE_MEGACART_128K => bank_out <= "0000" & cart_data_reg(2 downto 0);
+							when CART_TYPE_MEGACART_256K => bank_out <= "000" & cart_data_reg(3 downto 0);
+							when CART_TYPE_MEGACART_512K => bank_out <= "00" & cart_data_reg(4 downto 0);
+							when CART_TYPE_MEGACART_1024K => bank_out <= "0" & cart_data_reg(5 downto 0);
 							-- sic (all sizes)
 							when CART_TYPE_SIC =>
 								if (cart_addr_reg(7 downto 5) = "000") then
-									high_bank_enabled <= not CART_DATA(6);
-									low_bank_enabled <= CART_DATA(5);
-									bank_out <= "00" & CART_DATA(4 downto 0);
-									sic_d500_byte <= CART_DATA;
+									high_bank_enabled <= not cart_data_reg(6);
+									low_bank_enabled <= cart_data_reg(5);
+									bank_out <= "00" & cart_data_reg(4 downto 0);
+									sic_d500_byte <= cart_data_reg;
 								end if;
 							when others => null;
 						end case;
 						
 						-- switchable XEGS or megacart disable/enable
 						if (cart_type >= CART_TYPE_SW_XEGS_32K and cart_type <= CART_TYPE_SW_XEGS_1024K) then
-							high_bank_enabled <= not CART_DATA(7);
-							low_bank_enabled <= not CART_DATA(7);
+							high_bank_enabled <= not cart_data_reg(7);
+							low_bank_enabled <= not cart_data_reg(7);
 						end if;
 						if (cart_type >= CART_TYPE_MEGACART_16K and cart_type <= CART_TYPE_MEGACART_1024K) then
-							high_bank_enabled <= not CART_DATA(7);
-							low_bank_enabled <= not CART_DATA(7);
+							high_bank_enabled <= not cart_data_reg(7);
+							low_bank_enabled <= not cart_data_reg(7);
 						end if;
 						
 					end if; -- (cart_rw_reg = '0')
