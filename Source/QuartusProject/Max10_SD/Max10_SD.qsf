@@ -189,7 +189,7 @@ set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to EXT_SRAM_ADDR[2]
 set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to EXT_SRAM_ADDR[1]
 set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to EXT_SRAM_ADDR[0]
 set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to EXT_SRAM_CE
-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to CART_PHI2
+set_instance_assignment -name IO_STANDARD "3.3 V SCHMITT TRIGGER" -to CART_PHI2
 set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to CART_CTL
 set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to CART_RW
 set_location_assignment PIN_64 -to CART_CTL
@@ -200,4 +200,12 @@ set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to LED[1]
 set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to LED[2]
 set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to LED[4]
 set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to LED[3]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to CART_DATA[7]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to CART_DATA[6]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to CART_DATA[5]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to CART_DATA[4]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to CART_DATA[3]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to CART_DATA[2]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to CART_DATA[1]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to CART_DATA[0]
 set_instance_assignment -name PARTITION_HIERARCHY root_partition -to | -section_id Top

@@ -534,7 +534,7 @@ endoftext
 ; ************************ DATA ****************************
 	
 	.local top_text
-	.byte '       Ultimate Cartridge Menu          '
+	.byte '       Ultimate Cartridge Menu      v1.1'
 	.endl
 	.local bottom_text
 	.byte 'U=UpDir, SPACE/Z=Page Down/Up, X=Disable'
