@@ -10,6 +10,10 @@ It supports most ROMs up to 1 megabyte in size, including standard 8k and 16k ca
 SIC! Cart, Bounty Bob, OSS, SDX & Williams. ROM dumps can be easily converted into CAR format with my html/javascript
 conversion utility, [RomToCar](http://htmlpreview.github.com/?https://github.com/robinhedwards/UltimateCart/master/RomToCar.html).
 
+Update (Feb-2016)
+-----------------
+New firmware also allows XEX files (Atari executables) to be launched direct from the SD card.
+
 PCB Images
 ----------
 ![Bottom/Back of PCB when inserted in Atari](images/board_bottom_back.jpg?raw=true)
@@ -102,3 +106,9 @@ it by adding a 47k pull-up resistor as shown in the photo below.
 
 I may add pull-ups to the SD card in a future revision of the PCB.
 
+Credits
+-------
+* Design, PCB & FPGA firmware by Robin Edwards (electrotrains at atariage)
+* Atari boot menu & XEX loader by Jonathan Halliday (flashjazzcat at atariage)
+* Debugging - Matthias Reichl (HiassofT at atariage)
+* Help, suggestions and FAT32 LFN code from Mark Watson (foft at atariage)
