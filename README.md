@@ -43,6 +43,7 @@ and can be used instead. The programming files for the ES seem to work fine on t
 1 x 0805 LED (e.g. Farnell order code #1581239)
 1 x 200ohm 0805 Resistor (e.g. Farnell order code #2447602)
 1 x Header male 2x1 0.1" pitch
+1 x 47k 0805 Resistor (e.g. Farnell order code #2447664) [v3 Board only]
 ```
 
 Assembly
@@ -104,7 +105,7 @@ it by adding a 47k pull-up resistor as shown in the photo below.
 
 ![Image](images/SD_DO_pullup.jpg?raw=true)
 
-I may add pull-ups to the SD card in a future revision of the PCB.
+Note (1-Mar-16) - I have now uploaded a revised version of the board (v3) which adds this resistor to the PCB (labelled R11).
 
 Credits
 -------
