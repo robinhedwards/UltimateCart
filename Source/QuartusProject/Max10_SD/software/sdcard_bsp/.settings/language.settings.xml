@@ -2,7 +2,7 @@
 <project>
 	<configuration id="preference.org.eclipse.cdt.managedbuilder.core.configurationDataProvider.1034138763" name="Nios II">
 		<extension point="org.eclipse.cdt.core.LanguageSettingsProvider">
-			<provider class="com.altera.sbtgui.project.importer.Nios2GCCBuiltinSpecsDetector" console="false" env-hash="749283435719723539" id="altera.tool.Nios2GCCBuiltinSpecsDetector" keep-relative-paths="false" name="Nios II GCC Built-in Compiler Settings" parameter="${COMMAND} ${FLAGS} -E -P -v -dD &quot;${INPUTS}&quot;" prefer-non-shared="true">
+			<provider class="com.altera.sbtgui.project.importer.Nios2GCCBuiltinSpecsDetector" console="false" env-hash="-721069977737908416" id="altera.tool.Nios2GCCBuiltinSpecsDetector" keep-relative-paths="false" name="Nios II GCC Built-in Compiler Settings" parameter="${COMMAND} ${FLAGS} -E -P -v -dD &quot;${INPUTS}&quot;" prefer-non-shared="true">
 				<language-scope id="org.eclipse.cdt.core.gcc"/>
 				<language-scope id="org.eclipse.cdt.core.g++"/>
 			</provider>

@@ -1,5 +1,5 @@
 /* Ultimate SD Cartridge - Atari 400/800/XL/XE Multi-Cartridge
-   Copyright (C) 2015 Robin Edwards
+   Copyright (C) 2015 Robin Edwards and Jonathan Halliday
 
    This program is free software; you can redistribute it and/or
    modify it under the terms of the GNU General Public License
@@ -23,69 +23,13 @@
 */
 
 ;@com.wudsn.ide.asm.outputfileextension=.rom
-;CARTCS	= $bffa 			;Start address vector, used if CARTFG has CARTFG_START_CART bit set
-;CART	= $bffc				;Flag, must be zero for modules
-;CARTFG	= $bffd				;Flags or-ed together, indicating how to start the module.
-;CARTAD	= $bffe				;Initialization address vector
 
-CARTFG_DIAGNOSTIC_CART = $80		;Flag value: Directly jump via CARTAD during RESET.
-CARTFG_START_CART = $04			;Flag value: Jump via CARTAD and then via CARTCS.
-CARTFG_BOOT = $01			;Flag value: Boot peripherals, then start the module.
+	icl 'boot.inc'
+	icl 'macros.inc'
+	
+VER_MAJ	equ $01
+VER_MIN	equ $02
 
-COLDSV = $E477				; Coldstart (powerup) entry point
-WARMSV = $E474				; Warmstart entry point
-CH = $2FC				; Internal hardware value for the last key pressed
-BOOT = $09
-CASINI = $02
-
-color1 = $2c5				; Shadow of colpf1
-color2 = $2c6				; Shadow of colpf2
-color4 = $2c8				; Shadow of colbk
-
-rowcrs = $54				; cursor row byte 0..23
-colcrs = $55				; word 0..39
-
-sm_ptr = $58				; screen memory
-
-; Atari -> FPGA commands (Sent as D510 access)
-; 1-20 select item n
-; 64 disable cart
-; 127 prev page
-; 128 next page
-; 129 up directory
-; 130 reset
-; 255 acknowledge
-D500_DISABLE_BYTE = 64
-D500_PREV_PAGE_BYTE = 127
-D500_NEXT_PAGE_BYTE = 128
-D500_UP_DIR_BYTE = 129
-D500_RESET_BYTE = 130
-
-; FPGA -> Atari command (in ULTIMATE_CART_CMD_BYTE)
-; 0 nothing to do
-; 1 atari should display new directory entries (atari sends ack back to say done)
-; 2 error (message at $B300)
-; 255 reboot
-ULTIMATE_CART_CMD_BYTE = $AFF0
-
-; Directory list Flag
-; bit 0 - more files above, bit 1 - more files below
-ULTIMATE_CART_LIST_FLAG_BYTE = $AFF1
-
-
-; ************************ VARIABLES ****************************
-character 	= $80
-ypos 		= $81
-dir_ptr		= $82	// word
-dir_entry	= $84
-shortcut_key    = $85
-tmp_ptr		= $90	// word
-text_out_x	= $92	// word
-text_out_y	= $94	// word
-text_out_ptr	= $96	// word
-text_out_len	= $98
-shortcut_buffer	= $9a	// word
-; ************************ CODE ****************************
 	opt h-				;Disable Atari COM/XEX file headers
 
 	org $a000			;RD5 cartridge base
@@ -97,530 +41,1324 @@ init	.proc 				;Cartridge initalization
 	
 start	.proc 				;Cartridge start, RAM, graphics 0 and IOCB no for the editor (E:) are ready
 
-; ************************ MAIN ****************************
+
+//
+//	Main
+//
+
 main	.proc 
-; set up the colors
-	jsr set_colours
-	mva #$FF CH		; set last key pressed to none
+	lda #0
+	sta RevFlag
+	sta WaitCmdFlag
+	sta DirLevel			; start in root directory
+	sta MenuUpFlag
+	lda #$FF
+	sta CH				; set last key pressed to none
+	sta BootFlag
 	jsr copy_wait_for_reboot
-	mva #3 BOOT ; patch reset - from mapping the atari (revised) appendix 11
+	jsr CopyXEXLoader
+	mva #3 BOOT			; patch reset - from mapping the atari (revised) appendix 11
 	mwa #reset_routine CASINI
+	jsr InitJoystick
+	jsr SetUpDisplay
 	jsr clear_screen
-	jsr output_header
-	jsr output_footer
-	
-; main loop
+	jsr DisplayFooter
+	jsr HomeSelection
 main_loop
-	lda ULTIMATE_CART_CMD_BYTE
-	; update display?
-	cmp #$01
+	jsr HighlightCurrentEntry
+PollLoop
+	bit BootFlag
+	bpl @+
+	jsr CheckSoftBoot
+	jmp GotCmd
+@
+	lsr BootFlag
+	lda ULTIMATE_CART_CMD
+GotCmd
+	lsr BootFlag
+	cmp #CMD.Refresh
 	beq display_cmd
-	; error?
-	cmp #$02
+	cmp #CMD.LoadXEX
+	beq LoadXEX
+	cmp #CMD.Error
 	beq display_error
-	; reboot?
-	cmp #$FF
+	cmp #CMD.Reboot
 	beq reboot_cmd
-	; check for user pressing a key
-	jmp read_keyboard
+	bit WaitCmdFlag
+	bmi PollLoop
+	jmp Read_keyboard
+	
+LoadXEX				; load XEX
+	jsr CleanUp
+	sei				; prevent GINTLK check in deferred VBI
+	jsr send_fpga_ack_wait_clear
+	jmp LoadBinaryFile
 	
 display_cmd
-	jsr output_directory_entries
-; wait for the FPGA to clear the cmd byte
-	jsr send_fpga_ack_wait_clear
+	sec
+	ror MenuUpFlag
+	jsr RefreshList
+	jsr send_fpga_ack_wait_clear	; wait for the FPGA to clear the cmd byte
 	jmp main_loop
 
 display_error
 	jsr show_error
-; wait for the FPGA to clear the cmd byte
-	jsr send_fpga_ack_wait_clear
+	jsr send_fpga_ack_wait_clear	; wait for the FPGA to clear the cmd byte
 	jsr clear_screen
-	jsr set_colours	; restore normal colours
+	jsr set_colours			; restore normal colours
 	jmp main_loop
 	
 reboot_cmd
+	jsr CleanUp
 	jsr send_fpga_ack_wait_clear
-	sei	; prevent GINTLK check in deferred vbi
-	jsr $600
+	sei				; prevent GINTLK check in deferred VBI
+	jsr $100
 
 read_keyboard
-	ldx CH
-	cpx #$FF
-	bne key_pressed
-	jmp end_key
-; key pressed
-key_pressed
-	mva #$FF CH		; set last key pressed to none
-	lda scancodes,x
+	bit MenuUpFlag			; make sure we don't accept input until menu is displayed
+	bpl Main_Loop
+	jsr CheckJoyStick
 	cmp #$FF
-	bne check_reboot
-	jmp end_key
-; check for X (reboot)
-check_reboot
-	cmp #"X"
-	bne check_up
-	lda #D500_DISABLE_BYTE
-	jsr send_fpga_cmd
-	jmp end_key
-check_up
-; check for U (up dir)
-	cmp #"U"
-	bne check_space
-	jsr change_dir_message
-	lda #D500_UP_DIR_BYTE
-	jsr send_fpga_cmd
-	jmp end_key
-check_space
-; check_for space (next page)
-	cmp #" "
-	bne check_z
-	lda ULTIMATE_CART_LIST_FLAG_BYTE	; are there more files?
-	and #$02
-	beq end_key				; no
-	jsr next_page_message			; yes there are, display message
-	lda #D500_NEXT_PAGE_BYTE
-	jsr send_fpga_cmd
-	jmp end_key
-check_z
-; check_for z (prev page)
-	cmp #"Z"
-	bne check_item
-	lda ULTIMATE_CART_LIST_FLAG_BYTE	; are there previous files?
-	and #$01
-	beq end_key				; no
-	jsr prev_page_message			; yes there are, display message
-	lda #D500_PREV_PAGE_BYTE
-	jsr send_fpga_cmd
-	jmp end_key
-check_item
-; check between A & T (item)
-	cmp #"A"
-	bmi end_key
-	cmp #"T"+1
-	bpl end_key
-; we've selected an item
-	sub #("A"-1)
+	bne @+
+	jsr GetKey
+	beq Main_Loop
+@
+	jsr ToUpper
+	cmp #'T'+1			; check for slot shortcut
+	bcs @+
+	cmp #'A'			
+	bcc @+
+	sbc #'A'			; carry is set
+	cmp Entries			; see if we overshot the end of the list
+	jcs Main_Loop
+	jmp DoShortcut
+@
 	pha
-; find out what kind of item it is (file/dir/blank)
+	lsr MessageFlag
+	lda KeyList			; number of entries
+	asl @
+	clc
+	adc KeyList			; multiply entries by 3
 	tax
-	mwa #$b000 dir_ptr
-find_loop
-	dex
-	cpx #0
-	beq check_target_entry
-	adw dir_ptr #32
-	jmp find_loop
-check_target_entry	
-	ldy #0
-	lda (dir_ptr),y
-	cmp #1
-	bne check_dir
-	; its a file
-	jsr starting_cartridge_message
-	jmp send_selection
-check_dir
-	cmp #2
-	bne end_key
-	; its a directory
-	jsr change_dir_message
-	jmp send_selection
-send_selection
 	pla
-	jsr send_fpga_cmd
+ScanLoop
+	cmp KeyList,x
+	beq KeyFound
+	dex
+	dex
+	dex
+	bne ScanLoop
+	jmp Main_Loop
+KeyFound
+	lda #>[Main_Loop-1]
+	pha
+	lda #<[Main_Loop-1]
+	pha
+	lda KeyList-1,x
+	pha
+	lda KeyList-2,x
+	pha
+	rts
+KeyList
+	.byte 13
+	Target LaunchItem,Key.Return
+	Target CursorUp,Key.Up
+	Target CursorDown,Key.Down
+	Target CursorLeft,Key.Left
+	Target CursorRight,Key.Right
+	Target Reboot,Key.X
+	Target UpDir,Key.U
+	Target NextPage,Key.Space
+	Target PageUp,Key.Z
+	Target NextPage,Key.CtrlDn
+	Target PageUp,Key.CtrlUp
+	Target ListTop,Key.CtrlShiftUp
+	Target ListEnd,Key.CtrlShiftDown
+	.endp
+	
 
-end_key
-	jmp main_loop
-	.endp	; proc main
+.proc Reboot				; Reboot
+	lda #CCTL.DISABLE
+	jmp send_fpga_cmd
+	.endp
+	
+	
+	
+.proc UpDir				; Back up one level in directory tree
+	lda DirLevel
+	beq Done
+	lsr MenuUpFlag
+	jsr change_dir_message
+	jsr HomeSelection
+	lda #CCTL.UP_DIR
+	jsr send_fpga_cmd
+	sec
+	ror WaitCmdFlag
+	dec DirLevel			; say we backed up the directory tree
+Done
+	rts
+	.endp
+	
+	
+.proc ListTop
+	jsr ListTopMessage
+Loop
+	jsr PrevPage
+	beq Done
+@
+	lda ULTIMATE_CART_CMD
+	cmp #Cmd.Refresh
+	bne @-
+	jsr send_fpga_ack_wait_clear	; wait for the FPGA to clear the cmd byte
+	beq Loop
+Done
+	jsr CountEntries
+@
+	jsr CursorUp
+	bne @-
+	mva CurrEntry PrevEntry
+	lsr WaitCmdFlag
+	mwa #DIR_BUFFER CurrEntryPtr
+	sec
+	ror MenuUpFlag
+	jmp RefreshList
+	.endp
+	
+	
+.proc ListEnd
+	jsr ListEndMessage
+Loop
+	jsr NextPage
+	beq Done
+@
+	lda ULTIMATE_CART_CMD
+	cmp #Cmd.Refresh
+	bne @-
+	jsr send_fpga_ack_wait_clear	; wait for the FPGA to clear the cmd byte
+	beq Loop
+Done
+	jsr CountEntries
+@
+	jsr CursorDown
+	bne @-
+	mva CurrEntry PrevEntry
+	lsr WaitCmdFlag
+	sec
+	ror MenuUpFlag
+	jmp RefreshList
+	.endp
+	
+	
+.proc PrevPage
+	lda ULTIMATE_CART_LIST_FLAG
+	and #ListFlags.FilesBefore	; see if there are any prior entries
+	beq Done			; returns Z=1 if no prior entries
+	lsr MenuUpFlag
+	jsr EndSelection
+	lda #CCTL.PREV_PAGE
+	jsr send_fpga_cmd
+	sec
+	ror WaitCmdFlag			; this sets Z=0
+Done
+	rts
+	.endp
+	
+
+	
+.proc NextPage				; Display next page of entries
+	lda ULTIMATE_CART_LIST_FLAG
+	and #ListFlags.FilesAfter	; see if there are any more entries
+	beq Done			; returns Z=1 if no prior entries
+	lsr MenuUpFlag
+	jsr HomeSelection
+	lda #CCTL.NEXT_PAGE
+	jsr send_fpga_cmd
+	sec
+	ror WaitCmdFlag			; this sets Z=0
+Done
+	rts
+	.endp
+	
+	
+	
+.proc PageUp
+	jsr PrevPage
+	beq @+				; if PrevPage didn't do anything
+	jsr HomeSelection		; otherwise home the cursor
+@
+	rts
+	.endp
+	
+	
+
+	
+.proc DoShortcut			; Launch item via shortcut (pass item 0-19 in A)
+	sta tmp3			; save item
+Loop
+	jsr HighlightCurrentEntry	; move highlight bar
+	jsr WaitForSync			; give us time to see it
+	lda tmp3
+	cmp CurrEntry			; see if we need to move the selection bar
+	beq Done
+	bcs MoveDown
+UpLoop					; move the cursor up
+	jsr PrevItem
+	jmp Loop
+MoveDown
+	jsr NextItem
+	jmp Loop
+Done
+	jsr LaunchItem			; now the target item is selected, launch it
+	jmp Main.Main_Loop
+	.endp
+	
+	
+	
+.proc CursorUp
+	lda CurrEntry
+	bne PrevItem
+	jmp PrevPage
+	.endp
+	
+	
+.proc CursorDown
+	lda Entries
+	cmp #2
+	bcc @+
+	sbc #1
+	cmp CurrEntry			; is Entry < Entries - 1 ?
+	beq IsLastEntry
+	bcs NextItem
+@
+	rts
+IsLastEntry				; if we're at the final entry, load next page of list
+	jmp NextPage
+	.endp
+	
+	
+.proc CursorLeft
+	jmp UpDir
+	.endp
+	
+	
+.proc CursorRight
+	rts
+	.endp
+	
+	
+.proc PrevItem				; select previous item in list
+	dec CurrEntry
+	sbw CurrEntryPtr #$20
+	lda #1 				; say OK
+	rts
+	.endp
+	
+	
+.proc NextItem				; select next item in list
+	inc CurrEntry
+	adw CurrEntryPtr #$20
+	lda #1				; say OK
+	rts
+	.endp
+	
+	
+//
+//	Launch highlighted item
+//
+	
+.proc LaunchItem			
+	ldy #0
+	lda (CurrEntryPtr),y		; find out what the item is
+	beq Abort
+	lsr MenuUpFlag
+	cmp #EntryType.Dir
+	beq IsDir
+	cmp #EntryType.XEX
+	beq IsXEX
+	jsr starting_cartridge_message	; not Nul and not Dir, so must be a file
+	ldy CurrEntry
+	jmp SendSelection
+IsXEX
+	jsr StartingXEXLoaderMessage
+	ldy CurrEntry
+	jmp SendSelection
+IsDir
+	jsr change_dir_message		; it's a directory
+	inc DirLevel			; keep track of where we are in the tree
+	lda CurrEntry
+	pha
+	jsr HomeSelection
+	pla
+	tay
+SendSelection
+	iny				; FPGA expects 1-20, so bump value
+	tya
+	jsr send_fpga_cmd
+Abort
+	rts
+	.endp
 
 	.endp	; proc start
 
-; ************************ SUBROUTINES ****************************
-; send a byte to the FPGA (byte in Accumulator)
-.proc	send_fpga_cmd
-	sta $D510
+
+
+//
+//	Block waiting for key
+//
+
+.proc	WaitKey
+	jsr GetKey
+	beq WaitKey
 	rts
 	.endp
+	
+
+//
+//	Scan keyboard (returns N = 1 for no key pressed, else ASCII in A)
+//
+
+.proc	GetKey
+	ldx CH
+	cpx #$FF
+	beq NoKey
+	mva #$FF CH		; set last key pressed to none
+	lda scancodes,x
+	cmp #$FF
+NoKey
+	rts
+	.endp
+	
+	
+//
+//	Initialize Joystick
+//
+
+.proc InitJoystick
+	mva #$0F StickState
+	mva #$01 TriggerState
+	rts
+	.endp
+	
+	
+//
+//	Read Joystick
+//
+
+.proc CheckJoyStick
+	lda Trig0
+	cmp TriggerState
+	bne TriggerChange	; trigger change
+;	lda PORTA
+	lda STICK0
+	and #$0F
+	cmp StickState
+	bne StickChange		; stick change
+	ldy Timer
+	beq StickChange
+Return
+	lda #$FF
+	rts
+
+StickChange			; stick direction changed
+	sta StickState
+	ldy #6
+	sty Timer
+	cmp #$0F		; is stick centred?
+	beq Return		; if yes, do nothing
+	pha
+	lda TriggerState
+	tay
+	lsr @
+	lsr @
+	eor #$80
+	sta MotionFlag		; if we moved stick with trigger down, set flag to prevent button action on release
+	tya
+	asl @
+	asl @
+	tay
+	pla			; get stick direction bits
+	lsr @			; test up bit
+	bcc @+
+	iny			; down
+	lsr @
+	bcc @+
+	iny			; left
+	lsr @
+	bcc @+
+	iny			; right
+@
+	lda StickTable,y
+	rts
+StickTable
+	.byte Key.CtrlUp,Key.CtrlDn,Key.CtrlShiftUp,Key.CtrlShiftDown
+	.byte Key.Up,Key.Down,Key.Left,Key.Right
+
+
+TriggerChange			; trigger has either gone up or down
+	sta TriggerState
+	cmp #0
+	beq Done
+	bit MotionFlag		; if button has come up without any stick movement, issue a return key
+	bmi Done
+	lda #Key.Return
+	rts
+Done
+	lsr MotionFlag
+	lda #$FF
+	rts
+	.endp
+	
+	
+
+//
+// poll command register for a second to see if cart was run by soft reboot
+//
+
+.proc CheckSoftBoot
+	ldy #100
+Loop
+	jsr WaitForSync
+	lda ULTIMATE_CART_CMD
+	cmp #Cmd.Refresh
+	beq @+
+	cmp #Cmd.Error
+	beq @+
+	cmp #Cmd.Reboot
+	dey
+	bne Loop
+	lda #CCTL.Reset
+	jsr Send_FPGA_Cmd
+	lsr BootFlag
+	bcc CheckSoftBoot
+@
+	rts
+	.endp
+	
+
+//
+// Send a byte to the FPGA (byte in A)
+//
+
+.proc	send_fpga_cmd
+	lsr WaitCmdFlag
+	sta FPGA_CTRL
+	rts
+	.endp
+
 
 .proc send_fpga_ack_wait_clear
 	lda #$FF	; ack
 	jsr send_fpga_cmd
 wait_clear
-	lda ULTIMATE_CART_CMD_BYTE
+	lda ULTIMATE_CART_CMD
 	bne wait_clear
 	rts
 	.endp
 	
+	
+	
+//
+//	Tell FPGA we've done a reset
+//
+
 .proc	reset_routine
 	mva #3 BOOT
-	; tell the FPGA we've done a reset
-	lda #D500_RESET_BYTE
-	jsr send_fpga_cmd
-	rts
+	lda #CCTL.RESET
+	jmp send_fpga_cmd
 	.endp
 
-.proc	output_header
-	mva #0 text_out_x
-	mva #0 text_out_y
-	mwa #top_text text_out_ptr
-	mva #(.len top_text) text_out_len
-	jsr output_text_inverted
-	rts
-	.endp
 
-.proc	output_list_arrows
-	mwa sm_ptr tmp_ptr
-up_arrow
-	lda ULTIMATE_CART_LIST_FLAG_BYTE
-	and #$01
-	beq down_arrow
-	ldy #0
-	lda #92	; up arrow
-	ora #$80
-	sta (tmp_ptr),y
-down_arrow
-	lda ULTIMATE_CART_LIST_FLAG_BYTE
-	and #$02
-	beq exit
-	ldy #1
-	lda #93	; down arrow
-	ora #$80
-	sta (tmp_ptr),y
-exit
-	rts
-	.endp
 
-.proc	output_footer
-	mva #0 text_out_x
-	mva #23 text_out_y
-	mwa #bottom_text text_out_ptr
-	mva #(.len bottom_text) text_out_len
-	jsr output_text_inverted
-	rts
-	.endp
 
 .proc	show_error
-	mva #$31 color2		// background -> red
-	jsr clear_screen
-	jsr output_header
-	
-	mva #3 text_out_y
-	mva #2 text_out_x
-	mwa #error_text text_out_ptr
-	mva #(.len error_text) text_out_len
-	jsr output_text
-	
-	mva #4 text_out_y
-	mva #32 text_out_len
-	mwa #$B300 text_out_ptr
-	jsr output_text
-	
-	mva #$FF CH		; set last key pressed to none
-wait_key
-	ldx CH
-	cpx #$FF
-	beq wait_key
-	
-	mva #$FF CH		; set last key pressed to none
-	rts
+	ldax #ErrorMsg
+	jsr ShowMsg
+	jmp *
+;	ldx #70
+;@
+;	jsr WaitForSync
+;	dex
+;	bpl @-
+;	rts
 	.endp
+	
 
-.proc	set_colours
-	mva #$81 color2		// background
-	mva #$0F color1		// foreground (luma)
-	mva #$00 color4		// border
-	rts
-	.endp
 
-.proc	output_directory_entries
-	jsr clear_screen
-	jsr output_header
-	jsr output_list_arrows
-	jsr output_footer
-	
-	mwa #$b000 dir_ptr
-	mva #0 dir_entry
-	mva #1 ypos
-	mva #'A' shortcut_key
-next_entry
-	ldy dir_entry
-	cpy #20
-	bmi next
-	jmp end_of_page
-next
-	inc ypos
-	mva ypos text_out_y
-; output the keyboard shortcut
-	mva #2 text_out_x
-	mva shortcut_key shortcut_buffer
-	mva #'-' shortcut_buffer+1
-	mwa #shortcut_buffer text_out_ptr
-	mva #2 text_out_len
-	jsr output_text_inverted
-; output the directory entry
-	mva #5 text_out_x
-; is it a file or folder?
-	ldy #0
-	lda (dir_ptr),y
-	cmp #1
-	beq out_name
-	cmp #2
-	beq out_dir
-	jmp out_end
-out_dir
-	mwa dir_ptr text_out_ptr
-	adw text_out_ptr #1
-	mva #31 text_out_len
-	jsr output_text_inverted
-	jmp out_end
-out_name
-	mwa dir_ptr text_out_ptr
-	adw text_out_ptr #1
-	mva #31 text_out_len
-	jsr output_text
-out_end
-	inc dir_entry
-	inc shortcut_key
-	adw dir_ptr #32
-	jmp next_entry
-end_of_page
-	rts
+.proc	ListTopMessage
+	ldax #ListTopMsg
+	bne ShowMsg
 	.endp
+	
+	
+.proc	ListEndMessage
+	ldax #ListEndMsg
+	bne ShowMsg
+	.endp
+	
+	
 
 .proc	starting_cartridge_message
-	mva #11 text_out_y
-	mva #10 text_out_x
-	mwa #loading_text text_out_ptr
-	mva #(.len loading_text) text_out_len
-	jsr output_text_inverted
-	rts
+	ldax #StartCartMsg
+	bne ShowMsg
+	.endp
+	
+	
+.proc	StartingXEXLoaderMessage
+	ldax #StartXEXMsg
+	bne ShowMsg
 	.endp
 
 .proc	change_dir_message
-	mva #11 text_out_y
-	mva #10 text_out_x
-	mwa #directory_text text_out_ptr
-	mva #(.len directory_text) text_out_len
-	jsr output_text_inverted
-	rts
+	ldax #ChangeDirMsg
+	bne ShowMsg
 	.endp
 	
-.proc	next_page_message
-	mva #11 text_out_y
-	mva #13 text_out_x
-	mwa #next_page_text text_out_ptr
-	mva #(.len next_page_text) text_out_len
-	jsr output_text_inverted
-	rts
+	
+	
+.proc ShowMsg
+	stax MsgPtr
+	jsr SetUpMessageBox
+	adb TextLineCount #2 Height
+	jsr OpenWindow
+	ldax MsgPtr
+	jmp PrintMessageBoxText
+	.endp
+
+
+
+;.proc	DisplayHeader
+;	lda #0
+;	sta cx
+;	sta cy
+;	ldax #txtHeader
+;	jmp PutString
+;	.endp
+
+
+.proc	DisplayFooter
+	mva #20 cy
+	mva #0 cx
+	ldax #txtFooter
+	jmp PutString
 	.endp
 	
-.proc	prev_page_message
-	mva #11 text_out_y
-	mva #13 text_out_x
-	mwa #prev_page_text text_out_ptr
-	mva #(.len prev_page_text) text_out_len
-	jsr output_text_inverted
+	
+	
+.proc	ClearFooter
+	mva #21 cy
+	mva #0 cx
+	lda #32
+@
+	jsr PutChar
+	lda cx
+	cmp #40
+	bcc @-
 	rts
 	.endp
 
-; clear screen
-clear_screen .proc
-	mwa sm_ptr tmp_ptr
-	ldx #24	; lines
-yloop	lda #0
-	ldy #39
-xloop	sta (tmp_ptr),y
+
+.proc	Cleanup				; clean up prior to launching cart
+	jsr WaitForSync
+	sei
+	mva #$0 NMIEN			; disable interrupts
+	mwa OSVBI VVBLKI		; restore OS VBL
+	mwa OSDLI VDSLST		; reinstate OS DLI vector
+	lda #0
+	sta SDMCTL
+	sta DMACTL			; make sure screen blanks out immediately
+;	mva #$40 NMIEN			; enable VBI, disable DLI
+;	cli
+	rts
+	.endp
+
+
+
+//
+//	Count entries on current page
+//
+
+.proc CountEntries
+	mwa #DIR_BUFFER dir_ptr
+	lda #0
+	sta CurrEntry
+	sta Entries
+	tay
+Loop
+	lda (dir_ptr),y
+	beq Done
+	adw dir_ptr #$20	; bump filename pointer
+	inc Entries		; bump total entries
+	lda Entries
+	cmp #20
+	bcc Loop
+Done
+	mwa #DIR_BUFFER dir_ptr
+	rts
+	.endp
+	
+	
+	
+	
+//
+//	Display page of FAT filenames
+//
+	
+.proc RefreshList
+	mva #'A' tmp2		; shortcut key
+	mwa #DIR_BUFFER dir_ptr
+	lda #0
+	sta cx
+	sta Entry
+	sta Entries
+	mva #0 cy
+Loop
+	ldy #0
+	lda (dir_ptr),y
+	beq Done
+	jsr DisplayEntry
+	adw dir_ptr #$20	; bump filename pointer
+	inc Entry		; bump entry number
+	inc Entries		; bump total entries
+	inc tmp2		; bump shortcut key
+	inc cy
+	lda cy
+	cmp #20
+	bcc Loop
+Done
+	lda cy
+	cmp #20			; did we fill the screen?
+	bcs Finished
+	mva #0 cx
+	jsr PadLine
+	inc cy
+	bne Done
+Finished
+	jmp DisplayScrollIndicators
+	.endp
+	
+	
+//
+//	Display file list entry
+//
+	
+.proc DisplayEntry
+	lda #0
+	sta RevFlag
+	sta cx
+	lda #1
+	jsr PutChar
+	lda tmp2
+	eor #$80
+	jsr PutChar
+	lda #2
+	jsr PutChar
+	cpb Entry CurrEntry
+	bne @+
+	lda #1
+	jsr PutChar
+	ldx #128
+	stx RevFlag
+	jsr PutFileName
+	jsr PadFileName
+	lda #2
+	jmp PutChar
+@
+	lda #$20
+	jsr PutChar
+	jsr PutFileName
+	jsr PadFileName
+	lda #$20
+	jmp PutChar
+	.endp
+	
+	
+//
+//	Highlight current entry
+//
+
+.proc HighlightCurrentEntry
+	lda PrevEntry		; see if we need to un-highlight old entry
+	cmp CurrEntry
+	beq Done
+	ldx #0
+	jsr ReverseItem
+	lda CurrEntry
+	ldx #128
+	jsr ReverseItem
+	mva CurrEntry PrevEntry
+Done
+	rts
+	.endp
+	
+	
+//
+//	Reverse out an entry (pass entry in A)
+//
+
+.proc	ReverseItem
+	stx tmp1
+;	clc
+;	adc #1
+	tay
+	lda LineTable.Lo,y
+	clc
+	adc #3
+	sta ScrPtr
+	lda LineTable.Hi,y
+	adc #0
+	sta ScrPtr+1
+	ldy #34
+	lda #0
+	bit tmp1
+	spl
+	lda #66
+	sta (ScrPtr),y
 	dey
-	bpl xloop
-	adw tmp_ptr #40
-	dex
-	bne yloop
+@
+	lda (ScrPtr),y
+	eor #$80
+	sta (ScrPtr),y
+	dey
+	bne @-
+	lda #0
+	bit tmp1
+	spl
+	lda #65
+	sta (ScrPtr),y
 	rts
 	.endp
 	
-; output text in text_out_ptr at (cur_x, cur_y)
-output_text .proc
-	mwa sm_ptr tmp_ptr
-; add the cursor y offset
-	ldy text_out_y
-yloop	dey
-	bmi yend
-	adw tmp_ptr #40
-	jmp yloop
-yend	adw text_out_x tmp_ptr tmp_ptr ; add the cursor x offset
-; text output loop
-	ldy #0
-nextchar ; text output loop
-	lda (text_out_ptr),y
-	beq endoftext ; end of line?
-	cmp #96; convert ascii->internal
-	bcs lower
-	sec
+//
+//	Cursor home
+//
+
+.proc HomeSelection
+	mwa #DIR_BUFFER CurrEntryPtr
+	lda #0
+	sta CurrEntry
+	sta PrevEntry
+	rts
+	.endp
+	
+//
+//	Cursor home
+//
+
+.proc EndSelection
+	mwa #DIR_BUFFER+[19*32] CurrEntryPtr
+	lda #19
+	sta CurrEntry
+	sta PrevEntry
+	rts
+	.endp	
+	
+	
+	
+//
+//	Wait for sync
+//
+	
+.proc WaitForSync
+	lda VCount
+	rne
+	lda VCount
+	req
+	rts
+	.endp
+	
+	
+//
+//	Convert ATASCII to uppercase
+//
+	
+.proc ToUpper
+	cmp #'z'+1
+	bcs @+
+	cmp #'a'
+	bcc @+
 	sbc #32
-lower	sta (tmp_ptr),y
-	iny
-	cpy text_out_len
-	bne nextchar
-endoftext	
+@
 	rts
 	.endp
 
-; output text in text_out_ptr at (cur_x, cur_y)
-output_text_inverted .proc 
-	mwa sm_ptr tmp_ptr
-; add the cursor y offset
-	ldy text_out_y
-yloop	dey
-	bmi yend
-	adw tmp_ptr #40
-	jmp yloop
-yend	adw text_out_x tmp_ptr tmp_ptr ; add the cursor x offset
-; text output loop
-	ldy #0
-nextchar ; text output loop
-	lda (text_out_ptr),y
-	beq endoftext ; end of line?
-	cmp #96; convert ascii->internal
-	bcs lower
-	sec
-	sbc #32
-lower	ora #$80
-	sta (tmp_ptr),y
-	iny
-	cpy text_out_len
-	bne nextchar
-endoftext	
-	rts
-	.endp
+//
+//	Copy the wait and reboot routing to RAM so we're not running from ROM when the FPGA switches it
+//
 
-; copy the wait and reboot routing to RAM so we're not running from ROM when the FPGA switches it
 .proc	copy_wait_for_reboot
-;wait at least one frame then reboot
-;	lda:cmp:req 20
-;	lda:cmp:req 20
-;	jmp COLDSV
-	lda #$A5
-	sta $600
-	lda #$14
-	sta $601
-	lda #$C5
-	sta $602
-	lda #$14
-	sta $603
-	lda #$F0
-	sta $604
-	lda #$FC
-	sta $605
-	lda #$A5
-	sta $606
-	lda #$14
-	sta $607
-	lda #$C5
-	sta $608
-	lda #$14
-	sta $609
-	lda #$F0
-	sta $60A
-	lda #$FC
-	sta $60B
-	lda #$4C
-	sta $60C
-	lda #$77
-	sta $60D
-	lda #$E4
-	sta $60E
+	ldy #.len[RebootCode]
+@
+	lda RebootCode-1,y
+	sta $100-1,y
+	dey
+	bne @-
 	rts
 	.endp
+	
+.proc RebootCode
+	ldx #1
+	lda VCount
+@
+	cmp VCount
+	req
+	cmp VCount
+	rne
+	dex
+	bpl @-
+	jmp $E477
+	.endp
+	
+	
+//
+//	Force OS to cold boot
+//
+
+	
+	.local ForceColdStart
+	lda #0
+	sta NMIEN
+	tax
+@
+	sta $0000,x
+	sta $0200,x
+	sta $0300,x
+	sta $0400,x
+	sta $0500,x
+	inx
+	bne @-
+@
+	mva #$FF $0244
+	rts
+	.endl
+	
+
+
+//
+//	XEX Loader
+//
+
+.proc CopyXEXLoader
+	mwa #LoaderCodeStart ptr1
+	mwa #LoaderAddress ptr2
+	mwa #[EndLoaderCode-LoaderCode] ptr3
+	jmp UMove
+	.endp
+	
+
+	
+//
+//	Move bytes from ptr1 to ptr2, length ptr3
+//
+
+
+.proc UMove
+	lda ptr3
+	eor #$FF
+	adc #1
+	sta ptr3
+	lda ptr3+1
+	eor #$FF
+	adc #0
+	sta ptr3+1
+	
+	ldy #0
+Loop
+	lda (ptr1),y
+	sta (ptr2),y
+	iny
+	bne @+
+	inc ptr1+1
+	inc ptr2+1
+@
+	inc ptr3
+	bne Loop
+	inc ptr3+1
+	bne Loop
+	rts
+	.endp
+		
+	
+
+	
 	
 ; ************************ DATA ****************************
 	
-	.local top_text
-	.byte '       Ultimate Cartridge Menu      v1.1'
-	.endl
-	.local bottom_text
-	.byte 'U=UpDir, SPACE/Z=Page Down/Up, X=Disable'
-	.endl
+;txtHeader
+;	.byte '  Ultimate SD Cartridge Menu',0
+txtFooter
+	.byte 32,28+128,29+128,'-Move ',30+128,'-Up Dir ','Return'*,'-Select ','X'+128,'-Reboot'
+	.byte 32,32,32,'Ct'*,'+',28+128,29+128,'-Page Up/Dn ','Sh'*,'+','Ct'*,'+',28+128,29+128,'-Start/End',0
 	
-	.local loading_text
-	.byte ' Starting Cartridge... '
-	.endl
-	
-	.local directory_text
-	.byte ' Changing Directory... '
-	.endl
-	
-	.local prev_page_text
-	.byte ' Prev page... '
-	.endl
-	
-	.local next_page_text
-	.byte ' Next page... '
-	.endl
-	
-	.local error_text
-	.byte 'Error:'
-	.endl	
-	
-scancodes .array [256] = $ff
-	[63]:[127] = "A"              ; "" = internal code '' = ATASCII
-	[21]:[85]  = "B"
-	[18]:[82]  = "C"
-	[58]:[122] = "D"
-	[42]:[106] = "E"
-	[56]:[120] = "F"
-	[61]:[125] = "G"
-	[57]:[121] = "H"
-	[13]:[77]  = "I"
-	[1] :[65]  = "J"
-	[5] :[69]  = "K"
-	[0] :[64]  = "L"
-	[37]:[101] = "M"
-	[35]:[99]  = "N"
-	[8] :[72]  = "O"
-	[10]:[74]  = "P"
-	[47]:[111] = "Q"
-	[40]:[104] = "R"
-	[62]:[126] = "S"
-	[45]:[109] = "T"
-	[11]:[75]  = "U"
-	[16]:[80]  = "V"
-	[46]:[110] = "W"
-	[22]:[86]  = "X"
-	[43]:[107] = "Y"
-	[23]:[87]  = "Z"
-	[33]:[97]  = " "
-	[52]:[180] = $7e
-	[12]:[76]  = $9b
-	.enda
+StartXEXMsg
+	.byte 'Starting XEX Loader...',0
+StartCartMsg
+	.byte 'Starting Cartridge...',0
+ChangeDirMsg
+	.byte 'Changing Directory...',0
+NextPageMsg
+	.byte 'Next page...',0
+PrevPageMsg
+	.byte 'Previous page...',0
+ListTopMsg
+	.byte 'Start of list...',0
+ListEndMsg
+	.byte 'End of list...',0
 
-	org $aff0
+txtEllipsis	equ *-4
+
+	.align $100
+
+	
+
+	icl 'Display.s'
+		
+	
+scancodes
+	ins 'keytable.bin'
+	
+
+	org COMMAND_BUFFER
 	.byte 0,0,0,0
 	
-	org $b000
-	.local dir_entries			; test data
-	.byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-	.byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-	.byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-	.byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-	.byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-	.byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-	.byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-	.byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-	.byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-	.byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-	.byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-	.byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-	.byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-	.byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-	.byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-	.byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-	.byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-	.byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-	.byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-	.byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0	; 32 chars long
+	org DIR_BUFFER
+	.local dir_entries
+	.rept 32*20			; dir entries are 32 bytes long
+	.byte 0
+	.endr
 	.endl
 	
-	org $b300
-	.byte 'Test error message',0
+	org ERROR_MSG_BUFFER-7
+	
+ErrorMsg
+	.byte 'Error: '
+
+	.ds 40
+
+	.align $0200	
+	
+FontData
+	ins 'sdcart.fnt'
+	
+	
+LoaderCodeStart
+
+	opt f-
+	org LoaderAddress
+	opt f+
+	
+LoaderCode
+	.byte 'L'
+	.byte VER_MAJ
+	.byte VER_MIN
+
+	.proc LoadBinaryFile
+	jsr InitLoader
+Loop
+	mwa #Return IniVec	; reset init vector
+	jsr ReadBlock
+	bmi Error
+	cpw RunVec #Return
+	bne @+
+	mwa BStart RunVec	; set run address to start of first block
+@
+	jsr DoInit
+	jmp Loop
+Error
+	jmp (RunVec)
+Return
+	rts
+	.endp
+	
+	
+//
+//	Jump through init vector
+//
+	
+	.proc DoInit
+	jmp (IniVec)
+	.endp
+
+
+//
+//	Read block from executable
+//
+
+	.proc ReadBlock
+	jsr ReadWord
+	bmi Error
+	lda HeaderBuf
+	and HeaderBuf+1
+	cmp #$ff
+	bne NoSignature
+	jsr ReadWord
+	bmi Error
+NoSignature
+	mwa HeaderBuf BStart
+	jsr ReadWord
+	bmi Error
+	sbw HeaderBuf BStart BLen
+	inw BLen
+	mwa BStart IOPtr
+	jsr ReadBuffer
+Error
+	rts
+	.endp
+	
+	
+	
+	
+//
+//	Read word from XEX
+//
+
+	.proc ReadWord
+	mwa #HeaderBuf IOPtr
+	mwa #2 BLen		; fall into ReadBuffer
+	.endp
+
+
+
+//
+//	Read buffer from XEX
+//	Returns Z=1 on EOF
+//
+	
+	.proc ReadBuffer
+	jsr SetSegment
+Loop
+	lda BLen
+	ora BLen+1
+	beq Done
+	
+	lda FileSize		; first ensure we're not at the end of the file
+	ora FileSize+1
+	ora FileSize+2
+	ora FileSize+3
+	beq EOF
+
+	inc BufIndex
+	bne NoBurst			; don't burst unless we're at the end of the buffer
+	
+BurstLoop
+	inc SegmentLo			; bump segment if we reached end of buffer
+	bne @+
+	inc SegmentHi
+@
+	jsr SetSegment
+
+	lda Blen+1		; see if we can burst read the next 256 bytes
+	beq NoBurst
+	lda FileSize+1	; ensure buffer and remaining bytes in file are both >= 256
+	ora FileSize+2
+	ora FileSize+3
+	beq NoBurst
+
+	ldy #0			; read a whole page into RAM
+@
+	lda $D500,y		; doesn't matter about speculative reads (?)
+	sta (IOPtr),y
+	iny
+	bne @-
+	inc IOPtr+1		; bump address for next time
+
+	ldx #3			; y is already 0
+	sec
+@
+	lda FileSize,y	; reduce file size by 256
+	sbc L256,y
+	sta FileSize,y
+	iny
+	dex
+	bpl @-
+	dec Blen+1		; reduce buffer length by 256
+	dec BufIndex
+	bne ReadBuffer
+
+NoBurst
+	lda $D500
+BufIndex	equ *-2
+	ldy #0
+	sta (IOPtr),y
+	inw IOPtr
+	dew BLen
+	
+	ldx #3		; y is already 0
+	sec
+@
+	lda FileSize,y
+	sbc L1,y
+	sta FileSize,y
+	iny
+	dex
+	bpl @-
+	bmi Loop
+	
+Done
+	ldy #1
+	rts
+EOF
+	ldy #IOErr.EOF
+	rts
+	
+SetSegment
+	ldy #0
+SegmentLo equ *-1
+	ldx #0
+SegmentHi equ *-1
+	sty $D500
+	stx $D501
+	rts
+L1
+	.dword 1
+L256
+	.dword 256
+	.endp
+
+
+HeaderBuf	.word 0
+BStart		.word 0
+BLen		.word 0
+
+
+
+; Everything beyond here can be obliterated safely during the load
+	
+//
+//	Loader initialisation
+//
+	
+	.proc InitLoader
+	ldx #2
+	lda VCount			; wait 2 frames so that cart is disabled
+@
+	cmp VCount
+	req
+	cmp VCount
+	rne
+	dex
+	bpl @-
+
+	jsr SetGintlk
+	jsr BasicOff
+	cli
+	jsr OpenEditor
+	mwa #EndLoaderCode MEMLO
+	mwa #LoadBinaryFile.Return RunVec	; reset run vector
+	ldy #0
+	tya
+@
+	sta $80,y
+	iny
+	bpl @-
+	jsr ClearRAM
+	
+	ldy #3
+@
+	lda $D500,y
+	sta FileSize,y
+	dey
+	bpl @-
+	mva #3 ReadBuffer.BufIndex
+	rts
+	.endp
+
+	
+	
+	.proc BASICOff
+	mva #$01 $3f8
+	mva #$C0 $6A
+	lda portb
+	ora #$02
+	sta portb
+	rts
+	.endp
+	
+	
+
+	.proc SetGintlk
+	sta WSYNC
+	sta WSYNC
+	lda TRIG3
+	sta GINTLK
+	rts
+	.endp
+	
+	
+	
+	.proc ClearRAM
+	mwa #EndLoaderCode ptr1
+;	sbw $c000 ptr1 ptr2
+	sbw SDLSTL ptr1 ptr2		; clear up to display list address
+	
+	lda ptr2
+	eor #$FF
+	clc
+	adc #1
+	sta ptr2
+	lda ptr2+1
+	eor #$FF
+	adc #0
+	sta ptr2+1
+	ldy #0
+	tya
+Loop
+	sta (ptr1),y
+	iny
+	bne @+
+	inc ptr1+1
+@
+	inc ptr2
+	bne Loop
+	inc ptr2+1
+	bne Loop
+	rts
+	.endp
+	
+	
+	
+	.proc OpenEditor
+	ldx #0
+	lda #$0c
+	sta iocb[0].Command
+	jsr ciov
+	mwa #EName iocb[0].Address
+	mva #$0C iocb[0].Aux1
+	mva #$00 iocb[0].Aux2
+	mva #$03 iocb[0].Command
+	jmp ciov
+
+EName
+	.byte 'E:',$9B
+
+	.endp
+	
+
+
+	.if 0
+//
+//	Wait for sync
+//
+
+	.proc WaitForSync2
+	lda VCount
+	rne
+	lda VCount
+	req
+	rts
+	.endp
+	
+	.endif
+	
+
+	
+
+EndLoaderCode ; end of relocated code
+
+LoaderCodeSize	= EndLoaderCode-LoaderCode
+	
+	opt f-
+	org LoaderCodeStart + LoaderCodeSize
+	opt f+
 	
 ; ************************ CARTRIDGE CONTROL BLOCK *****************
 

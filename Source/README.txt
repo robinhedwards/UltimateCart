@@ -1,4 +1,4 @@
-The Quartus project needs Quartus II 14.1 or above.
+The Quartus project needs Quartus II 15.1 or above.
 
 Some notes
 ==========

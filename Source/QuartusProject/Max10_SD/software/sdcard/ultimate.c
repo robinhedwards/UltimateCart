@@ -66,6 +66,7 @@ static int ledVal = 0x1E;
 #define CART_TYPE_EXPRESS_64K		33	// 64k
 #define CART_TYPE_SDX_128K			34	// 128k
 #define CART_TYPE_BLIZZARD_16K		35	// 16k
+#define CART_TYPE_XEX				254
 #define CART_TYPE_NONE				255
 
 #define CART_DIR_ENTRIES	0x1000
@@ -84,6 +85,7 @@ static int ledVal = 0x1E;
 #define CART_CMD_IDLE			0
 #define CART_CMD_DISPLAY_DIR	1
 #define CART_CMD_ERROR			2
+#define CART_CMD_XEX_LOADER		3
 #define CART_CMD_REBOOT			255
 
 /* Directory flag byte FGPA -> Atari
@@ -177,9 +179,9 @@ FRESULT read_directory(char* path)
             	entry_type = 2;
             }
             else
-            {	// a file - check its a ROM or CAR file
+            {	// a file - check its a ROM, CAR or a XEX file
                 char *ext = get_filename_ext(fno.fname);
-                if (strcmp(ext, "CAR") != 0 && strcmp(ext, "ROM") != 0) continue;
+                if (strcmp(ext, "CAR") != 0 && strcmp(ext, "ROM") != 0 && strcmp(ext, "XEX") != 0) continue;
                 entry_type = 1;
             }
             // valid entry
@@ -198,6 +200,11 @@ FRESULT read_directory(char* path)
     return res;
 }
 
+#define ENTRY_TYPE_NONE	0
+#define ENTRY_TYPE_ROM	1
+#define ENTRY_TYPE_DIR	2
+#define ENTRY_TYPE_XEX	3
+
 void populate_cart_file_list()
 {
 	int i;
@@ -210,7 +217,16 @@ void populate_cart_file_list()
 		if (dir_offset + i < num_dir_entries)
 		{
 			DIR_ENTRY *entry = &dir_entries[dir_offset + i];
-			entry_type = entry->isDir ? 2 : 1;
+			if (entry->isDir)
+				entry_type = ENTRY_TYPE_DIR;
+			else
+			{
+				char *ext = get_filename_ext(entry->filename);
+				if (strcmp(ext, "XEX") == 0)
+					entry_type = ENTRY_TYPE_XEX;
+				else
+					entry_type = ENTRY_TYPE_ROM;
+			}
 			strncpy(cart_dir_mem_base+(i*32)+1, entry->long_filename, 31);
 		}
 		*(cart_dir_mem_base+(i*32)) = entry_type;
@@ -242,7 +258,7 @@ unsigned char recieve_atari_byte()
 
 void atari_reboot_with_cart(int cart_type)
 {
-	set_cart_cmd_byte(CART_CMD_REBOOT);
+	set_cart_cmd_byte(cart_type == CART_TYPE_XEX ? CART_CMD_XEX_LOADER : CART_CMD_REBOOT);
 	recieve_atari_byte();
 	set_cart_cmd_byte(CART_CMD_IDLE);
 	// wait 10ms to ensure the atari is running from ram before we switch the ROM
@@ -254,9 +270,11 @@ void atari_reboot_with_cart(int cart_type)
 int load_cart(char *filename)
 {
 	int i,cart_type = -1;	// default to file error
-	int car_file = 0;
+	int car_file = 0, xex_file = 0;
 	if (strncmp(filename+strlen(filename)-4, ".CAR", 4) == 0)
 		car_file = 1;
+	if (strncmp(filename+strlen(filename)-4, ".XEX", 4) == 0)
+		xex_file = 1;
 
 	//printf("loading %s\n", filename);
 	if (pf_open(filename) == FR_OK) {
@@ -268,12 +286,18 @@ int load_cart(char *filename)
 		unsigned int *dst32 = (unsigned int *)dst;
 		unsigned char buf[512];	// for file read
 
+		if (xex_file == 1)
+			dst32++;	// leave 4 bytes for the file size when we're copying a XEX
+
 		UINT numBytesRead;
 		// always read file in 512 byte chunks, since the SPI code is optimised for that
-		while (pf_read(buf, 512, &numBytesRead) == FR_OK) {
+		while (pf_read(buf, 512, &numBytesRead) == FR_OK)
+		{
 			int bytesToCopy = numBytesRead;
 			unsigned int *src32 = (unsigned int *)buf;
-			if (car_file == 1 && (void*)dst32 == (void*)dst) {
+
+			if (car_file == 1 && (void*)dst32 == (void*)dst)
+			{
 				// read cartridge type from header
 				int car_type = buf[7];
 				if (car_type == 1) cart_type = CART_TYPE_8K;
@@ -302,14 +326,23 @@ int load_cart(char *filename)
 				bytesToCopy -= 16;
 				src32 += 4;
 			}
+
+			// copy 4 bytes at a time
 			for (i=0; i<bytesToCopy/4; i++)
 				*dst32++ = *src32++;
+
+			// if we're at the end of a XEX file, there might be 1-3 trailing bytes left uncopied by the above
+			if (bytesToCopy % 4 != 0)
+				*dst32++ = *src32++;
+
 			length += bytesToCopy;
 			if (numBytesRead < 512)
 				break;
 		}
 
-		if (car_file == 0) {
+		if (xex_file == 1)
+			cart_type = CART_TYPE_XEX;
+		else if (car_file == 0) {
 			// not a CAR file, try to guess the type
 			if (length == 16*1024) cart_type = CART_TYPE_16K;
 			else if (length == 32*1024) cart_type = CART_TYPE_XEGS_32K;
@@ -320,10 +353,14 @@ int load_cart(char *filename)
 			else if (length == 1024*1024) cart_type = CART_TYPE_ATARIMAX_8MBIT;
 		}
 
-		if (length % 1024 != 0) {
+		if (xex_file == 0 && (length % 1024 != 0)) {
 			// if ROM length not a multiple of 1024 bytes, must be a bad file
 			cart_type = -1;
 		}
+
+		// add the file length when we've copied a xex file
+		if (xex_file == 1)
+			*(unsigned int *)dst = length;
 
 		//printf("cart type=%d\n", cart_type);
 		//printf("copied %d bytes to SRAM\n", length);

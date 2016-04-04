@@ -84,7 +84,8 @@ ARCHITECTURE structure OF atari_rom IS
 	constant CART_TYPE_EXPRESS_64K : integer := 33;
 	constant CART_TYPE_SDX_128K : integer := 34;
 	constant CART_TYPE_BLIZZARD_16K : integer := 35;
-	constant CART_TYPE_NONE	: integer := 255;
+	constant CART_TYPE_XEX : integer := 254;
+	constant CART_TYPE_NONE : integer := 255;
 
 	signal fpga_data_out : std_logic_vector (7 downto 0);
 	signal sram_data_out : std_logic_vector (7 downto 0);
@@ -121,6 +122,11 @@ ARCHITECTURE structure OF atari_rom IS
 	-- SIC d500 byte
 	signal sic_d500_byte : std_logic_vector(7 downto 0);
 	signal sic_read_d500 : boolean := false;
+	
+	-- XEX access
+	signal file_offset: std_logic_vector(15 downto 0);
+	signal xex_read_d500 : boolean := false;
+	signal xex_access: std_logic;
 	
 	-- Register some cartridge bus signals on the rising edge
 	signal cart_addr_reg : std_logic_vector (12 downto 0);
@@ -198,11 +204,12 @@ BEGIN
 	CART_RD5 <= high_bank_enabled;
 	CART_RD4 <= low_bank_enabled;
 	
-	CART_DATA <= data_out when (CART_S5 = '0' or CART_S4 = '0' or (CART_CTL = '0' and sic_read_d500))
+	CART_DATA <= data_out when (CART_S5 = '0' or CART_S4 = '0' or (CART_CTL = '0' and (sic_read_d500 or xex_read_d500)))
 					 else "ZZZZZZZZ";
 	
 	sram_cart_bus_enabled <= '0' when cart_type = CART_TYPE_BOOT else '1';
-	LED <= nios_led_out when cart_type = CART_TYPE_BOOT else "0000" & not (high_bank_enabled or low_bank_enabled);
+	xex_access <= '1' when xex_read_d500 else '0';
+	LED <= nios_led_out when cart_type = CART_TYPE_BOOT else "0000" & not (high_bank_enabled or low_bank_enabled or xex_access);
 	
 	-- store the cartridge bus address on rising edge of phi2
 	-- since it may be invalid by the falling edge (outside spec 6502s)
@@ -217,6 +224,8 @@ BEGIN
 			-- SIC D500-D51F read ?
 			sic_read_d500 <= (cart_type = CART_TYPE_SIC and CART_CTL = '0'
 									and CART_RW = '1' and CART_ADDR(7 downto 5) = "000");
+			-- XEX D500-D5FF read ?
+			xex_read_d500 <= (cart_type = CART_TYPE_XEX and CART_CTL = '0' and CART_RW = '1');
 		end if;
 	end process;
 	
@@ -238,8 +247,9 @@ BEGIN
 					high_bank_enabled <= '1';
 					bank_out <= "0000000";
 					-- Cartridge type specific initialisation
-					if (new_cart_type = CART_TYPE_NONE) then
+					if (new_cart_type = CART_TYPE_NONE or new_cart_type = CART_TYPE_XEX) then
 						high_bank_enabled <= '0';
+						file_offset <= (others => '0');
 					elsif (new_cart_type = CART_TYPE_16K or new_cart_type = CART_TYPE_BLIZZARD_16K) then
 						low_bank_enabled <= '1';
 					elsif (new_cart_type = CART_TYPE_ATARIMAX_8MBIT) then
@@ -381,7 +391,14 @@ BEGIN
 									bank_out <= "00" & CART_DATA(4 downto 0);
 									sic_d500_byte <= CART_DATA;
 								end if;
-							when others => null;
+							-- xex loader support - D500,D501 are lo-byte hi-byte of file offset (in 256 byte chunks)
+							when CART_TYPE_XEX =>
+								if (cart_addr_reg(7 downto 0) = x"00") then
+									file_offset(7 downto 0) <= CART_DATA;
+								elsif (cart_addr_reg(7 downto 0) = x"01") then
+									file_offset(15 downto 8) <= CART_DATA;
+								end if;
+							when others => null;							
 						end case;
 						
 						-- switchable XEGS or megacart disable/enable
@@ -429,6 +446,12 @@ BEGIN
 		if (cart_type = CART_TYPE_BOOT) then
 			fpga_address_in <= cart_addr_reg;
 			
+		elsif (cart_type = CART_TYPE_XEX) then
+			if (cart_ctl_reg = '0' and cart_rw_reg = '1') then
+				sram_ce <= '1';
+				sram_address_in <= file_offset(11 downto 0) & cart_addr_reg(7 downto 0);
+			end if;
+
 		elsif (cart_type /= CART_TYPE_NONE) then
 		
 			if (cart_s5_reg = '0' or cart_s4_reg = '0') then
