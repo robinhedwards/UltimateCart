@@ -107,6 +107,12 @@ it by adding a 47k pull-up resistor as shown in the photo below.
 
 Note (1-Mar-16) - I have now uploaded a revised version of the board (v3) which adds this resistor to the PCB (labelled R11).
 
+3d Printed Cartridge Shell (13-Jul-17)
+-------
+I have added STL files (and the source files) so you can use a 3d printer to make a nice cartridge shell for your PCB.
+![3d printed shell](images/shell.jpg?raw=true)
+![3d printed shell when inserted in Atari](images/shell_in_xl.jpg?raw=true)
+
 Credits
 -------
 * Design, PCB & FPGA firmware by Robin Edwards (electrotrains at atariage)
