@@ -84,6 +84,7 @@ ARCHITECTURE structure OF atari_rom IS
 	constant CART_TYPE_EXPRESS_64K : integer := 33;
 	constant CART_TYPE_SDX_128K : integer := 34;
 	constant CART_TYPE_BLIZZARD_16K : integer := 35;
+	constant CART_TYPE_TURBOSOFT : integer := 36;
 	constant CART_TYPE_XEX : integer := 254;
 	constant CART_TYPE_NONE : integer := 255;
 
@@ -363,6 +364,12 @@ BEGIN
 						when CART_TYPE_BLIZZARD_16K =>
 							high_bank_enabled <= '0';
 							low_bank_enabled <= '0';
+						-- TurboSoft 64k & 128k
+						when CART_TYPE_TURBOSOFT =>
+							if (cart_addr_reg(7 downto 5) = "000") then
+								high_bank_enabled <= not cart_addr_reg(4);
+								bank_out <= "000" & cart_addr_reg(3 downto 0);
+							end if;
 						when others => null;
 					end case;
 					
