@@ -67,6 +67,7 @@ static int ledVal = 0x1E;
 #define CART_TYPE_SDX_128K			34	// 128k
 #define CART_TYPE_BLIZZARD_16K		35	// 16k
 #define CART_TYPE_TURBOSOFT 		36	// 64k,128k
+#define CART_TYPE_ATRAX_128K		37	// 128k
 #define CART_TYPE_XEX				254
 #define CART_TYPE_NONE				255
 
@@ -312,6 +313,7 @@ int load_cart(char *filename)
 				else if (car_type == 13) cart_type = CART_TYPE_XEGS_64K;
 				else if (car_type == 14) cart_type = CART_TYPE_XEGS_128K;
 				else if (car_type == 15) cart_type = CART_TYPE_OSS_16K_TYPE_B;
+				else if (car_type == 17) cart_type = CART_TYPE_ATRAX_128K;
 				else if (car_type == 18) cart_type = CART_TYPE_BOUNTY_BOB;
 				else if (car_type >= 23 && car_type <= 25) cart_type = (car_type - 23) + CART_TYPE_XEGS_256K;
 				else if (car_type >= 26 && car_type <= 32) cart_type = (car_type - 26) + CART_TYPE_MEGACART_16K;
