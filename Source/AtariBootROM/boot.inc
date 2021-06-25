@@ -12,8 +12,6 @@ CARTFG_BOOT				equ $01		;Flag value: Boot peripherals, then start the module.
 COLDSV		equ $E477		; Coldstart (powerup) entry point
 WARMSV		equ $E474		; Warmstart entry point
 CH		equ $2FC		; Internal hardware value for the last key pressed
-BOOT		equ $09
-CASINI		equ $02
 
 drkmsk		equ $4E
 colrsh		equ $4F
@@ -146,6 +144,17 @@ TRIG3	equ $D013
 
 FMSZPG	equ	$43
 Critic	equ $42
+
+COLDST	equ $0244
+BASICF	equ $3f8
+RAMTOP	equ $6A
+WARMST	equ $08
+DOSVEC	equ $0A
+RAMSIZ	equ $02E4
+MEMTOP	equ $02E5
+
+BOOT		equ $09
+CASINI		equ $02
 
 IOPtr		equ FMSZPG
 FileSize	equ FMSZPG+2 ; .ds 4

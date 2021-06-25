@@ -1051,24 +1051,36 @@ LoaderCode
 	.byte VER_MAJ
 	.byte VER_MIN
 
-	.proc LoadBinaryFile
+	.local LoadBinaryFile
 	jsr InitLoader
+	tsx
+	lda #0
+@
+	sta.w $0100-1,x
+	dex
+	bne @-
 Loop
 	mwa #Return IniVec	; reset init vector
 	jsr ReadBlock
 	bmi Error
 	cpw RunVec #Return
+	bne NoRunSet
+	ldax BStart
+	cpx #> RunVec	; if first segment sets run address, don't set run address to start of first segment
 	bne @+
-	mwa BStart RunVec	; set run address to start of first block
+	cmp #< RunVec
+	beq NoRunSet
 @
+	stax RunVec	; set run address to start of first block
+NoRunSet
 	jsr DoInit
 	jmp Loop
-Error
-	jmp (RunVec)
 Return
 	rts
-	.endp
-	
+Error
+	jmp (RunVec)
+	.endl
+
 	
 //
 //	Jump through init vector
@@ -1084,6 +1096,7 @@ Return
 //
 
 	.proc ReadBlock
+	inc critic
 	jsr ReadWord
 	bmi Error
 	lda HeaderBuf
@@ -1101,6 +1114,9 @@ NoSignature
 	mwa BStart IOPtr
 	jsr ReadBuffer
 Error
+	php
+	dec critic
+	plp
 	rts
 	.endp
 	
@@ -1126,15 +1142,15 @@ Error
 	.proc ReadBuffer
 	jsr SetSegment
 Loop
-	lda BLen
-	ora BLen+1
-	beq Done
-	
 	lda FileSize		; first ensure we're not at the end of the file
 	ora FileSize+1
 	ora FileSize+2
 	ora FileSize+3
 	beq EOF
+	
+	lda BLen
+	ora BLen+1
+	beq Done
 
 	inc BufIndex
 	bne NoBurst			; don't burst unless we're at the end of the buffer
@@ -1259,14 +1275,16 @@ BLen		.word 0
 	dey
 	bpl @-
 	mva #3 ReadBuffer.BufIndex
+	mva #1 boot
+;	mva #0 warmst
 	rts
 	.endp
 
 	
 	
 	.proc BASICOff
-	mva #$01 $3f8
-	mva #$C0 $6A
+	mva #$01 basicf
+	mva #$C0 ramtop
 	lda portb
 	ora #$02
 	sta portb
