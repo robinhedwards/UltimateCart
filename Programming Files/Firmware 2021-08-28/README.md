@@ -1,4 +1,4 @@
-###### Firmware updated by Atariage forum user
+## Firmware updated by Atariage forum user
 
 Change details and user name :
 
