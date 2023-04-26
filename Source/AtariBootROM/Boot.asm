@@ -1259,14 +1259,15 @@ BLen		.word 0
 	dey
 	bpl @-
 	mva #3 ReadBuffer.BufIndex
+	mva #1 boot		
 	rts
 	.endp
 
 	
 	
 	.proc BASICOff
-	mva #$01 $3f8
-	mva #$C0 $6A
+	mva #$01 BASICF
+	mva #$C0 RAMTOP
 	lda portb
 	ora #$02
 	sta portb

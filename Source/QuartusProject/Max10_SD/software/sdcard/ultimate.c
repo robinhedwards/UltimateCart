@@ -66,6 +66,9 @@ static int ledVal = 0x1E;
 #define CART_TYPE_EXPRESS_64K		33	// 64k
 #define CART_TYPE_SDX_128K			34	// 128k
 #define CART_TYPE_BLIZZARD_16K		35	// 16k
+#define CART_TYPE_TURBOSOFT 		36	// 64k,128k
+#define CART_TYPE_ATRAX_128K		37	// 128k
+#define CART_TYPE_4_K				38  // 4k
 #define CART_TYPE_XEX				254
 #define CART_TYPE_NONE				255
 
@@ -311,6 +314,7 @@ int load_cart(char *filename)
 				else if (car_type == 13) cart_type = CART_TYPE_XEGS_64K;
 				else if (car_type == 14) cart_type = CART_TYPE_XEGS_128K;
 				else if (car_type == 15) cart_type = CART_TYPE_OSS_16K_TYPE_B;
+				else if (car_type == 17) cart_type = CART_TYPE_ATRAX_128K;
 				else if (car_type == 18) cart_type = CART_TYPE_BOUNTY_BOB;
 				else if (car_type >= 23 && car_type <= 25) cart_type = (car_type - 23) + CART_TYPE_XEGS_256K;
 				else if (car_type >= 26 && car_type <= 32) cart_type = (car_type - 26) + CART_TYPE_MEGACART_16K;
@@ -321,7 +325,12 @@ int load_cart(char *filename)
 				else if (car_type == 43) cart_type =  CART_TYPE_SDX_128K;
 				else if (car_type == 44) cart_type = CART_TYPE_OSS_8K;
 				else if (car_type == 45) cart_type = CART_TYPE_OSS_16K_043M;
+				else if (car_type == 50 || car_type == 51) cart_type = CART_TYPE_TURBOSOFT;
 				else if (car_type >= 54 && car_type <=56) cart_type = CART_TYPE_SIC;
+				else if (car_type == 58 ) {
+					cart_type = CART_TYPE_4_K;
+					memset(dst32, 255, 4096);
+				}
 				else { cart_type = -2; break; }	// unsupported car type
 				bytesToCopy -= 16;
 				src32 += 4;

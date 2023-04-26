@@ -84,6 +84,9 @@ ARCHITECTURE structure OF atari_rom IS
 	constant CART_TYPE_EXPRESS_64K : integer := 33;
 	constant CART_TYPE_SDX_128K : integer := 34;
 	constant CART_TYPE_BLIZZARD_16K : integer := 35;
+	constant CART_TYPE_TURBOSOFT : integer := 36;
+	constant CART_TYPE_ATRAX_128K : integer := 37;
+	constant CART_TYPE_4K : integer := 38;
 	constant CART_TYPE_XEX : integer := 254;
 	constant CART_TYPE_NONE : integer := 255;
 
@@ -204,8 +207,8 @@ BEGIN
 	CART_RD5 <= high_bank_enabled;
 	CART_RD4 <= low_bank_enabled;
 	
-	CART_DATA <= data_out when (CART_S5 = '0' or CART_S4 = '0' or (CART_CTL = '0' and (sic_read_d500 or xex_read_d500)))
-					 else "ZZZZZZZZ";
+	CART_DATA <= data_out when ((CART_S5 = '0' and high_bank_enabled = '1') or (CART_S4 = '0' and low_bank_enabled = '1') or (CART_CTL = '0' and (sic_read_d500 or xex_read_d500))) 
+					else "ZZZZZZZZ";
 	
 	sram_cart_bus_enabled <= '0' when cart_type = CART_TYPE_BOOT else '1';
 	xex_access <= '1' when xex_read_d500 else '0';
@@ -363,6 +366,16 @@ BEGIN
 						when CART_TYPE_BLIZZARD_16K =>
 							high_bank_enabled <= '0';
 							low_bank_enabled <= '0';
+						-- TurboSoft 64k & 128k
+						when CART_TYPE_TURBOSOFT =>
+							if (cart_addr_reg(7 downto 5) = "000") then
+								high_bank_enabled <= not cart_addr_reg(4);
+								bank_out <= "000" & cart_addr_reg(3 downto 0);
+							end if;
+						-- Atrax 128K
+						when CART_TYPE_ATRAX_128K => 
+							high_bank_enabled <= not CART_DATA(7);
+							bank_out <= "000" & CART_DATA(3 downto 0);
 						when others => null;
 					end case;
 					
@@ -526,6 +539,8 @@ BEGIN
 					else
 						sram_address_in <= bank_out(5 downto 0) & "1" & cart_addr_reg;
 					end if;
+				when CART_TYPE_4k =>
+					sram_address_in <= "00000000" & cart_addr_reg(11 downto 0); -- 0xB000 access
 				when others => null;
 			end case;
 			
