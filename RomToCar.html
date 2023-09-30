@@ -39,6 +39,9 @@
 			
 		<script type="text/javascript">
 		var car_types = {
+			size_4 : [ 
+				{name: 'Standard 4k cartridge (not supported by UnoCart)', id: 58 },
+			],
 			size_8 : [ 
 				{name: 'Standard 8k cartridge', id: 1 },
 				{name: 'OSS 8 KB cartridge', id: 44 },
@@ -56,6 +59,7 @@
 				{name: '32 KB Williams cartridge', id: 22 },
 				{name: 'MegaCart 32 KB cartridge', id: 27 },
 				{name: 'Switchable XEGS 32 KB cartridge', id: 33 },
+				{name: 'MicroCalc/Ultracart 32KB cartridge (not supported by Ultimate Cart)', id: 52 },
 			],
 			size_40 : [ 
 				{name: 'Bounty Bob Strikes Back 40 KB cartridge', id: 18 },
@@ -68,14 +72,17 @@
 				{name: 'SpartaDOS X 64 KB cartridge', id: 11 },
 				{name: 'MegaCart 64 KB cartridge', id: 28 },
 				{name: 'Switchable XEGS 64 KB cartridge', id: 34 },
+				{name: 'Turbosoft 64 KB cartridge (not supported by UnoCart)', id: 50 },
 			],
 			size_128 : [ 
 				{name: 'XEGS 128 KB cartridge', id: 14 },
+				{name: 'Atrax 128 KB cartridge (not supported by UnoCart)', id: 17 },
 				{name: 'Atarimax 128 KB cartridge', id: 41 },
 				{name: 'MegaCart 128 KB cartridge', id: 29 },
 				{name: 'Switchable XEGS 128 KB cartridge', id: 35 },
 				{name: 'SpartaDOS X 128 KB cartridge', id: 43 },
 				{name: 'SIC! 128 KB cartridge', id: 54 },
+				{name: 'Turbosoft 128 KB cartridge (not supported by UnoCart)', id: 51 },
 			],
 			size_256 : [ 
 				{name: 'XEGS 256 KB cartridge', id: 23 },
@@ -219,7 +226,7 @@
  |  |||||||||||  |
  |  ||_______||  | <b>Atari 8-bit ROM to CAR file conversion</b>
  | / _________ \ | 
- | LLLLLLLLLLL L |               Robin Edwards 2015
+ | LLLLLLLLLLL L |               Robin Edwards 2015-2023
  | LLLLLLLLLLL L |
  |___[_____]_____|
 
@@ -227,7 +234,8 @@ ROM/BIN files are simple dumps of a cartridge ROM. You need to know what type of
 is from. Available options are shown on a list when the file is read. Choose one of the options to save
 a CAR file of the correct type.
 
-Converts to those cartridge types supported by the <b>Ultimate Cartridge</b>.
+Converts to those cartridge types supported by the <b>Ultimate Cartridge</b>, <b>UnoCart</b>, <b>A8PicoCart</b>.
+Note that only the Ultimate Cart supports cartridge sizes more than 128k.
 
 Tested in Firefox & Chrome.
 In Firefox you may want to go to Tools/Options and select "Always ask me where to save files".
